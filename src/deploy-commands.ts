@@ -7,6 +7,10 @@ const pingCommand = new SlashCommandBuilder()
   .setName("ping")
   .setDescription("Botun çalışıp çalışmadığını test eder");
 
+const ticketPanelCommand = new SlashCommandBuilder()
+  .setName("ticketpanel")
+  .setDescription("Bu kanala destek talebi (ticket) panelini gönderir (Sadece Yetkili)");
+
 export async function registerCommands(client: Client): Promise<void> {
   const token = process.env.DISCORD_TOKEN!;
   const rest = new REST({ version: "10" }).setToken(token);
@@ -17,7 +21,7 @@ export async function registerCommands(client: Client): Promise<void> {
     return;
   }
 
-  const commands = [pingCommand.toJSON()];
+  const commands = [pingCommand.toJSON(), ticketPanelCommand.toJSON()];
 
   const clientId = client.application?.id;
   if (!clientId) {

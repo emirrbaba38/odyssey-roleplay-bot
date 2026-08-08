@@ -1,5 +1,12 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import { registerCommands } from "./deploy-commands.js";
+import {
+  handleTicketPanelCommand,
+  handleTicketCategorySelect,
+  handleTicketCloseButton,
+  TICKET_SELECT_ID,
+  TICKET_CLOSE_PREFIX,
+} from "./commands/ticket.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -26,10 +33,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === "ping") {
         await interaction.reply("🏓 Pong! Bot çalışıyor.");
+      } else if (interaction.commandName === "ticketpanel") {
+        await handleTicketPanelCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
+    } else if (interaction.isStringSelectMenu()) {
+      if (interaction.customId === TICKET_SELECT_ID) {
+        await handleTicketCategorySelect(interaction);
+      }
     } else if (interaction.isButton()) {
-      // Buton etkileşimleri buraya eklenecek (örn. ticket, rol ver/al panelleri).
+      if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
+        await handleTicketCloseButton(interaction);
+      }
     }
   } catch (err) {
     console.error("Etkileşim hatası:", err);

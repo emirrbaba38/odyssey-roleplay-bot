@@ -1,5 +1,7 @@
 import { ChannelType, Guild, GuildMember, TextChannel } from "discord.js";
 
+export const STAFF_ROLE_NAME = "Yetkili";
+
 export function findRoleByName(guild: Guild, name: string) {
   return guild.roles.cache.find(
     (role) => role.name.trim().toLowerCase() === name.trim().toLowerCase()
