@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
@@ -78,29 +79,33 @@ const TICKET_CATEGORIES: TicketCategoryOption[] = [
   },
 ];
 
-export function buildTicketPanelMessage(guild: Guild) {
+export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | null) {
   const embed = new EmbedBuilder()
-    .setColor(Colors.Purple)
-    .setTitle(`🎫 ${guild.name} — Destek Merkezi`)
+    .setColor(Colors.DarkAqua)
+    .setAuthor({ name: guild.name, iconURL: guild.iconURL() ?? undefined })
+    .setTitle("🎫 Destek Merkezine Hoş Geldin")
     .setDescription(
-      "Aşağıdaki menüden talebine en uygun kategoriyi seç, senin için özel bir destek kanalı açılsın.\n\n" +
-        "Açılan kanalı sadece **sen** ve **yetkili ekibimiz** görebilecek."
+      "Aşağıdaki menüden talebine en uygun kategoriyi seçerek sana özel bir destek kanalı açabilirsin.\n\n" +
+        "▫️ Aynı anda sadece **1 açık ticket**'ın olabilir\n" +
+        "▫️ Kanalı sadece **sen** ve **yetkili ekibimiz** görebilir\n" +
+        "▫️ İşin bitince ticket'ı kendin de kapatabilirsin"
     )
-    .setThumbnail(guild.iconURL({ size: 256 }) ?? null)
-    .setFooter({ text: `${guild.name} • Destek Sistemi`, iconURL: guild.iconURL() ?? undefined })
+    .setThumbnail(botAvatarURL)
+    .setFooter({ text: "Destek Sistemi" })
     .setTimestamp();
 
   const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(TICKET_SELECT_ID)
-      .setPlaceholder("Ticket açmak için kategori seçiniz.")
+      .setPlaceholder("🎫 Ticket kategorisini seç...")
       .addOptions(
-        TICKET_CATEGORIES.map((cat) => ({
-          value: cat.value,
-          label: cat.label,
-          description: cat.description,
-          emoji: cat.emoji,
-        }))
+        TICKET_CATEGORIES.map((cat) =>
+          new StringSelectMenuOptionBuilder()
+            .setValue(cat.value)
+            .setLabel(cat.label)
+            .setDescription(cat.description)
+            .setEmoji(cat.emoji)
+        )
       )
   );
 
@@ -128,7 +133,9 @@ export async function handleTicketPanelCommand(
     return;
   }
 
-  await interaction.reply(buildTicketPanelMessage(guild));
+  await interaction.reply(
+    buildTicketPanelMessage(guild, interaction.client.user?.displayAvatarURL({ size: 256 }) ?? null)
+  );
 }
 
 export async function handleTicketCategorySelect(
@@ -214,14 +221,15 @@ export async function handleTicketCategorySelect(
   }
 
   const welcomeEmbed = new EmbedBuilder()
-    .setColor(Colors.Purple)
+    .setColor(Colors.DarkAqua)
+    .setAuthor({ name: guild.name, iconURL: guild.iconURL() ?? undefined })
     .setTitle(`${category.emoji} Yeni Ticket — ${category.label}`)
     .setDescription(
       `Merhaba ${interaction.user}! Talebini buraya detaylıca yazabilirsin, ekibimiz en kısa sürede sana dönüş yapacak.\n\n` +
         `**Kategori:** ${category.label}`
     )
-    .setThumbnail(guild.iconURL({ size: 256 }) ?? null)
-    .setFooter({ text: guild.name, iconURL: guild.iconURL() ?? undefined })
+    .setThumbnail(interaction.client.user?.displayAvatarURL({ size: 256 }) ?? null)
+    .setFooter({ text: "Destek Sistemi" })
     .setTimestamp();
 
   const closeRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
