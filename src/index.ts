@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { registerCommands } from "./deploy-commands.js";
+import { registerCommands, registerCommandsForGuild } from "./deploy-commands.js";
 import {
   handleTicketPanelCommand,
   handleTicketCategorySelect,
@@ -34,6 +34,11 @@ const client = new Client({
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`✅ Giriş yapıldı: ${readyClient.user.tag}`);
   await registerCommands(client);
+});
+
+client.on(Events.GuildCreate, async (guild) => {
+  console.log(`➕ Yeni sunucuya eklendim: "${guild.name}", komutlar kaydediliyor...`);
+  await registerCommandsForGuild(client, guild.id);
 });
 
 registerAutoRole(client);
