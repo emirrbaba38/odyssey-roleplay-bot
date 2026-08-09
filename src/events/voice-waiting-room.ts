@@ -185,10 +185,10 @@ function createMixedAnnouncementResource(offsetMs: number, announcementFilePath:
     // kesiyor. apad olmadan konuşma (birkaç sn) bitince ducked müzik dalı da
     // orada kesilir. Konuşmayı sessizlikle sona kadar uzatarak, kesme kararını
     // tamamen müzik dalının (amix duration=first) uzunluğuna bırakıyoruz.
-    // volume=6dB: konuşma kaydının sesi orijinaline göre belirgin şekilde artırılıyor
-    // (müzik kanalına dokunulmuyor), böylece anons daha net ve gür duyuluyor.
+    // volume=10dB: konuşma sesi belirgin şekilde artırılıyor; alimiter ile de
+    // olası kırpılma (distortion) önleniyor. Müzik kanalına dokunulmuyor.
     "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[music];" +
-      "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=6dB,apad,asplit=2[speech1][speech2];" +
+      "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=10dB,alimiter=limit=0.95,apad,asplit=2[speech1][speech2];" +
       "[music][speech1]sidechaincompress=threshold=0.05:ratio=20:attack=5:release=1000:makeup=2[ducked];" +
       "[ducked][speech2]amix=inputs=2:duration=first:dropout_transition=0[aout]",
     "-map", "[aout]",
@@ -268,7 +268,7 @@ async function playAnnouncement(guildId: string): Promise<void> {
 function createPlainAnnouncementResource(): AudioResource {
   const proc = spawnFfmpeg([
     "-i", ANNOUNCEMENT_AUDIO_PATH,
-    "-af", "volume=6dB",
+    "-af", "volume=10dB,alimiter=limit=0.95",
     "-c:a", "libopus",
     "-f", "ogg",
     "pipe:1",
