@@ -72,7 +72,7 @@ export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | nul
         "▫️ Kanalı sadece **sen** ve **Ticket Yetkilisi** ekibimiz görebilir\n" +
         "▫️ İşin bitince ticket'ı kendin de kapatabilirsin"
     )
-    .setImage(botAvatarURL)
+    .setThumbnail(botAvatarURL)
     .setFooter({ text: "Destek Sistemi" })
     .setTimestamp();
 
