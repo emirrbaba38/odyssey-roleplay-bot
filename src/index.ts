@@ -9,6 +9,7 @@ import {
   TICKET_CLOSE_PREFIX,
   TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
+import { registerAutoRole } from "./events/auto-role.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -29,6 +30,8 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`✅ Giriş yapıldı: ${readyClient.user.tag}`);
   await registerCommands(client);
 });
+
+registerAutoRole(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
