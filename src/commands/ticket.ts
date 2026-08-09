@@ -18,9 +18,15 @@ import {
 import {
   KURUCU_ROLE_NAME,
   TICKET_STAFF_ROLE_NAME,
+  YONETIM_SEFI_ROLE_NAME,
   memberHasRoleNamed,
   findRoleByName,
 } from "../lib/permissions.js";
+import {
+  incrementClosedTicket,
+  getAllClosedTicketStats,
+  resetClosedTicketStats,
+} from "../lib/ticket-stats.js";
 
 export const TICKET_SELECT_ID = "ticket_category_select";
 export const TICKET_CLOSE_PREFIX = "ticket_close_";
@@ -329,22 +335,72 @@ export async function handleTicketCloseButton(interaction: ButtonInteraction): P
     return;
   }
 
-  const openedById = interaction.customId.slice(TICKET_CLOSE_PREFIX.length);
-  const isOwner = interaction.user.id === openedById;
   const isTicketStaff = memberHasRoleNamed(member as GuildMember, TICKET_STAFF_ROLE_NAME);
 
-  if (!isOwner && !isTicketStaff) {
+  if (!isTicketStaff) {
     await interaction.reply({
-      content: `❌ Bu ticket'ı sadece açan kişi veya **${TICKET_STAFF_ROLE_NAME}** kapatabilir.`,
+      content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** kapatabilir.`,
       ephemeral: true,
     });
     return;
   }
 
   ticketClaims.delete(interaction.channelId);
+  incrementClosedTicket(interaction.user.id);
 
   await interaction.reply("🔒 Bu ticket 5 saniye içinde kapatılacak...");
   setTimeout(async () => {
     await interaction.channel?.delete().catch(() => {});
   }, 5000);
+}
+
+export async function handleTopAllCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const member = interaction.member;
+  if (!member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu komut sadece sunucu içinde kullanılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleNamed(member as GuildMember, YONETIM_SEFI_ROLE_NAME)) {
+    await interaction.reply({
+      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const stats = getAllClosedTicketStats();
+
+  const embed = new EmbedBuilder().setColor(Colors.DarkAqua).setTitle("🎫 Ticket").setTimestamp();
+
+  if (stats.length === 0) {
+    embed.setDescription("Henüz kimse ticket kapatmamış.");
+  } else {
+    embed.setDescription(
+      stats
+        .map((s, i) => `**${i + 1}.** <@${s.userId}> — **${s.count}** ticket`)
+        .join("\n")
+    );
+  }
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+export async function handleTopResetCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const member = interaction.member;
+  if (!member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu komut sadece sunucu içinde kullanılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleNamed(member as GuildMember, YONETIM_SEFI_ROLE_NAME)) {
+    await interaction.reply({
+      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  resetClosedTicketStats();
+  await interaction.reply("✅ Tüm ticket istatistikleri sıfırlandı.");
 }

@@ -3,6 +3,7 @@ import { ChannelType, Guild, GuildMember, TextChannel } from "discord.js";
 export const STAFF_ROLE_NAME = "Yetkili";
 export const KURUCU_ROLE_NAME = "Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";
+export const YONETIM_SEFI_ROLE_NAME = "🔷・Yönetim Şefi";
 export const NEW_PLAYER_ROLE_NAME = "✖️・Yeni Oyuncu";
 
 export function findRoleByName(guild: Guild, name: string) {

@@ -5,6 +5,8 @@ import {
   handleTicketCategorySelect,
   handleTicketCloseButton,
   handleTicketClaimButton,
+  handleTopAllCommand,
+  handleTopResetCommand,
   TICKET_SELECT_ID,
   TICKET_CLOSE_PREFIX,
   TICKET_CLAIM_PREFIX,
@@ -42,6 +44,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.reply("🏓 Pong! Bot çalışıyor.");
       } else if (interaction.commandName === "ticketpanel") {
         await handleTicketPanelCommand(interaction);
+      } else if (interaction.commandName === "topall") {
+        await handleTopAllCommand(interaction);
+      } else if (interaction.commandName === "topsıfırla") {
+        await handleTopResetCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {

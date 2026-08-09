@@ -11,6 +11,14 @@ const ticketPanelCommand = new SlashCommandBuilder()
   .setName("ticketpanel")
   .setDescription("Bu kanala destek talebi (ticket) panelini gönderir (Sadece Yetkili)");
 
+const topAllCommand = new SlashCommandBuilder()
+  .setName("topall")
+  .setDescription("Kim kaç ticket kapattı, listeler (Sadece Yönetim Şefi)");
+
+const topResetCommand = new SlashCommandBuilder()
+  .setName("topsıfırla")
+  .setDescription("Ticket kapatma istatistiklerini sıfırlar (Sadece Yönetim Şefi)");
+
 export async function registerCommands(client: Client): Promise<void> {
   const token = process.env.DISCORD_TOKEN!;
   const rest = new REST({ version: "10" }).setToken(token);
@@ -21,7 +29,7 @@ export async function registerCommands(client: Client): Promise<void> {
     return;
   }
 
-  const commands = [pingCommand.toJSON(), ticketPanelCommand.toJSON()];
+  const commands = [pingCommand.toJSON(), ticketPanelCommand.toJSON(), topAllCommand.toJSON(), topResetCommand.toJSON()];
 
   const clientId = client.application?.id;
   if (!clientId) {
