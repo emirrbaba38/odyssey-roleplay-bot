@@ -9,22 +9,29 @@ import {
   StreamType,
   VoiceConnection,
   AudioPlayer,
+  AudioResource,
 } from "@discordjs/voice";
 import ytdl from "@distube/ytdl-core";
 import googleTTS from "google-tts-api";
 import { Readable } from "node:stream";
-import { existsSync, createReadStream } from "node:fs";
+import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import ffmpegPath from "ffmpeg-static";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Repoya bir müzik dosyası eklenirse (örn. assets/waiting-music.mp3), YouTube'a hiç gidilmez.
+// Repoya eklenen müzik dosyası (assets/waiting-music.mp3), YouTube'a hiç gidilmez.
 const LOCAL_MUSIC_PATH = join(__dirname, "..", "..", "assets", "waiting-music.mp3");
 
 const WAITING_VOICE_CHANNEL_NAME = "Kayıt Bekleme";
 const MUSIC_URL = "https://www.youtube.com/watch?v=QTe65ySAfRY&list=PLiF7nO4rHMbPjauQWeDJqi2G7g2Ybs3Xr&index=2";
 const ANNOUNCEMENT_TEXT =
   "Şu anda kayıtlarımız kapalıdır, çok yakın zamanda açılacaktır.";
+// Anons sırasında müziğin kısılacağı ses seviyesi (0-1 arası, 1 = tam ses).
+const MUSIC_DUCK_VOLUME = 0.25;
 
 const ANNOUNCEMENT_INTERVAL_MS = 20_000;
 const MUSIC_RETRY_BASE_MS = 10_000;
@@ -36,6 +43,9 @@ interface RoomState {
   player: AudioPlayer;
   connection: VoiceConnection;
   mode: Mode;
+  // Sıradaki müzik segmentinin dosya içinde nereden başlayacağı (ms).
+  offsetMs: number;
+  currentResource?: AudioResource;
 }
 
 // key: guildId -> aktif bağlantı bilgisi
@@ -46,11 +56,10 @@ const connecting = new Set<string>();
 const announcementIntervals = new Map<string, NodeJS.Timeout>();
 // key: guildId -> art arda kaç kez müzik başlatma denemesi başarısız oldu (backoff için).
 const musicFailureCounts = new Map<string, number>();
-// key: guildId -> bekleyen bir retry zamanlayıcısı var mı (üst üste retry planlamayı önlemek için).
+// key: guildId -> bekleyen bir retry zamanlayıcısı var mı.
 const musicRetryTimers = new Map<string, NodeJS.Timeout>();
 
 export function registerVoiceWaitingRoom(client: Client): void {
-  // Bot açıldığında (ve zaten sunucularda olduğu için) hemen bağlanmayı dene.
   client.once(Events.ClientReady, async (readyClient) => {
     for (const guild of readyClient.guilds.cache.values()) {
       tryConnectToWaitingRoom(guild.id, client).catch((err) =>
@@ -59,7 +68,6 @@ export function registerVoiceWaitingRoom(client: Client): void {
     }
   });
 
-  // Yeni bir sunucuya eklenirse de dene.
   client.on(Events.GuildCreate, async (guild) => {
     tryConnectToWaitingRoom(guild.id, client).catch((err) =>
       console.error("[kayıt-bekleme] guildCreate bağlantı hatası:", err)
@@ -72,16 +80,12 @@ export function registerVoiceWaitingRoom(client: Client): void {
       const waitingChannel = findWaitingChannel(guild);
       if (!waitingChannel) return;
 
-      // Bot henüz bağlı değilse (kanal sonradan oluşturulmuş olabilir) bağlan.
       if (!activeConnections.has(guild.id)) {
         await tryConnectToWaitingRoom(guild.id, newState.client);
       }
 
-      // Kanaldaki insan sayısı her değişimde yeniden değerlendirilir (giriş/çıkış).
       evaluatePresence(guild.id, waitingChannel);
 
-      // Bot Discord tarafından kanaldan atılırsa (örn. biri onu manuel sürüklerse)
-      // tekrar bağlanmayı dene.
       if (newState.member?.user.id === client.user?.id && newState.channelId !== waitingChannel.id) {
         cleanupConnection(guild.id);
         await tryConnectToWaitingRoom(guild.id, client);
@@ -101,7 +105,6 @@ function evaluatePresence(guildId: string, waitingChannel: VoiceChannel): void {
 
   if (humanCount > 0) {
     if (!announcementIntervals.has(guildId)) {
-      // Odaya ilk giren için hemen bir anons + 20sn'de bir tekrar.
       playAnnouncement(guildId).catch((err) =>
         console.error("[kayıt-bekleme] anons çalınamadı:", err)
       );
@@ -129,15 +132,30 @@ function findWaitingChannel(guild: import("discord.js").Guild): VoiceChannel | u
   ) as VoiceChannel | undefined;
 }
 
-function createMusicResource() {
-  if (existsSync(LOCAL_MUSIC_PATH)) {
-    const stream = createReadStream(LOCAL_MUSIC_PATH);
-    stream.on("error", (err) => {
-      console.error("[kayıt-bekleme] yerel müzik dosyası okunamadı:", err);
-    });
-    return createAudioResource(stream, { inputType: StreamType.Arbitrary });
-  }
+function spawnFfmpeg(args: string[]) {
+  if (!ffmpegPath) throw new Error("ffmpeg-static binary bulunamadı");
+  const proc = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  proc.on("error", (err) => console.error("[kayıt-bekleme] ffmpeg process hatası:", err));
+  // stderr'i sessizce tüket (ffmpeg logları çok gürültülü, sadece process crash olursa yukarıda yakalanır).
+  proc.stderr.on("data", () => {});
+  return proc;
+}
 
+// Yerel dosyadan, belirtilen ms konumundan itibaren düz müzik akışı üretir (Ogg/Opus).
+function createMusicResourceFromOffset(offsetMs: number): AudioResource {
+  const offsetSeconds = Math.max(0, offsetMs / 1000).toFixed(2);
+  const proc = spawnFfmpeg([
+    "-ss", offsetSeconds,
+    "-i", LOCAL_MUSIC_PATH,
+    "-c:a", "libopus",
+    "-f", "ogg",
+    "pipe:1",
+  ]);
+  return createAudioResource(proc.stdout, { inputType: StreamType.OggOpus });
+}
+
+// YouTube fallback (yerel dosya yoksa) — offset korunamaz, sadece eski davranış.
+function createMusicResourceFromYoutube(): AudioResource {
   const stream = ytdl(MUSIC_URL, {
     filter: "audioonly",
     quality: "highestaudio",
@@ -151,19 +169,22 @@ function createMusicResource() {
   return createAudioResource(stream, { inputType: StreamType.Arbitrary });
 }
 
-async function createAnnouncementResource() {
-  const url = googleTTS.getAudioUrl(ANNOUNCEMENT_TEXT, {
-    lang: "tr",
-    slow: false,
-    host: "https://translate.google.com",
-  });
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`TTS indirilemedi: ${res.status}`);
-  }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const stream = Readable.from(buffer);
-  return createAudioResource(stream, { inputType: StreamType.Arbitrary });
+// Anonsu + müziği (kısık ses) aynı anda mixleyip tek bir Ogg/Opus akışı olarak üretir.
+// Çıktının uzunluğu anonsun uzunluğu kadardır (duration=first).
+function createMixedAnnouncementResource(offsetMs: number, announcementFilePath: string): AudioResource {
+  const offsetSeconds = Math.max(0, offsetMs / 1000).toFixed(2);
+  const proc = spawnFfmpeg([
+    "-i", announcementFilePath,
+    "-ss", offsetSeconds,
+    "-i", LOCAL_MUSIC_PATH,
+    "-filter_complex",
+    `[0:a]aresample=48000[a0];[1:a]aresample=48000,volume=${MUSIC_DUCK_VOLUME}[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+    "-map", "[aout]",
+    "-c:a", "libopus",
+    "-f", "ogg",
+    "pipe:1",
+  ]);
+  return createAudioResource(proc.stdout, { inputType: StreamType.OggOpus });
 }
 
 function playMusic(guildId: string): void {
@@ -171,7 +192,10 @@ function playMusic(guildId: string): void {
   if (!state) return;
   state.mode = "music";
   try {
-    const resource = createMusicResource();
+    const resource = existsSync(LOCAL_MUSIC_PATH)
+      ? createMusicResourceFromOffset(state.offsetMs)
+      : createMusicResourceFromYoutube();
+    state.currentResource = resource;
     state.player.play(resource);
   } catch (err) {
     console.error("[kayıt-bekleme] müzik başlatılamadı:", err);
@@ -179,9 +203,8 @@ function playMusic(guildId: string): void {
   }
 }
 
-// Art arda başarısız denemelerde YouTube'u/log'ları spamlememek için artan bekleme süresiyle tekrar dener.
 function scheduleMusicRetry(guildId: string): void {
-  if (musicRetryTimers.has(guildId)) return; // zaten bekleyen bir retry var
+  if (musicRetryTimers.has(guildId)) return;
 
   const failures = (musicFailureCounts.get(guildId) ?? 0) + 1;
   musicFailureCounts.set(guildId, failures);
@@ -201,12 +224,53 @@ function scheduleMusicRetry(guildId: string): void {
 async function playAnnouncement(guildId: string): Promise<void> {
   const state = activeConnections.get(guildId);
   if (!state) return;
-  // Zaten bir anons çalıyorsa üst üste tetikleme.
-  if (state.mode === "announcement") return;
+  if (state.mode === "announcement") return; // zaten çalıyor, üst üste tetikleme
 
+  // Müziğin şu ana kadar ilerlediği kısmı offset'e ekle (kaldığımız yeri işaretle).
+  const playedSoFar = state.currentResource?.playbackDuration ?? 0;
+  state.offsetMs += playedSoFar;
+
+  if (!existsSync(LOCAL_MUSIC_PATH)) {
+    // Yerel dosya yoksa mixleme yapılamaz, eski davranış: TTS'i tek başına çal.
+    const resource = await createPlainAnnouncementResource();
+    state.mode = "announcement";
+    state.currentResource = resource;
+    state.player.play(resource);
+    return;
+  }
+
+  const ttsUrl = googleTTS.getAudioUrl(ANNOUNCEMENT_TEXT, {
+    lang: "tr",
+    slow: false,
+    host: "https://translate.google.com",
+  });
+  const res = await fetch(ttsUrl);
+  if (!res.ok) {
+    throw new Error(`TTS indirilemedi: ${res.status}`);
+  }
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const tmpPath = join(tmpdir(), `announcement-${guildId}.mp3`);
+  await writeFile(tmpPath, buffer);
+
+  const resource = createMixedAnnouncementResource(state.offsetMs, tmpPath);
   state.mode = "announcement";
-  const resource = await createAnnouncementResource();
+  state.currentResource = resource;
   state.player.play(resource);
+}
+
+async function createPlainAnnouncementResource(): Promise<AudioResource> {
+  const url = googleTTS.getAudioUrl(ANNOUNCEMENT_TEXT, {
+    lang: "tr",
+    slow: false,
+    host: "https://translate.google.com",
+  });
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`TTS indirilemedi: ${res.status}`);
+  }
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const stream = Readable.from(buffer);
+  return createAudioResource(stream, { inputType: StreamType.Arbitrary });
 }
 
 async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise<void> {
@@ -238,7 +302,7 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
     console.log("[kayıt-bekleme] ses kanalına bağlanıldı, müzik başlatılıyor...");
 
     const player = createAudioPlayer();
-    const state: RoomState = { player, connection, mode: "music" };
+    const state: RoomState = { player, connection, mode: "music", offsetMs: 0 };
     activeConnections.set(guildId, state);
 
     connection.subscribe(player);
@@ -248,10 +312,20 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
       musicFailureCounts.delete(guildId);
     });
 
-    // Bir kaynak bitince (anons ya da müzik), sırada müzik çalsın.
+    // Bir segment doğal olarak biterse: anonstan sonra offset'i ilerletip müziğe dön,
+    // düz müzik dosyanın sonuna gelirse başa sar.
     player.on(AudioPlayerStatus.Idle, () => {
-      if (!activeConnections.has(guildId)) return;
-      playMusic(guildId);
+      const current = activeConnections.get(guildId);
+      if (!current) return;
+
+      if (current.mode === "announcement") {
+        const played = current.currentResource?.playbackDuration ?? 0;
+        current.offsetMs += played;
+        playMusic(guildId);
+      } else {
+        current.offsetMs = 0; // dosya sonuna ulaşıldı, başa sar
+        playMusic(guildId);
+      }
     });
 
     player.on("error", (err) => {
