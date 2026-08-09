@@ -382,7 +382,7 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
   const stats = getAllClosedTicketStats();
   const madalyalar = ["🥇", "🥈", "🥉"];
 
-  const embed = new EmbedBuilder()
+  const ticketEmbed = new EmbedBuilder()
     .setColor(Colors.DarkAqua)
     .setAuthor({
       name: interaction.guild?.name ?? "Destek Sistemi",
@@ -393,10 +393,10 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
     .setTimestamp();
 
   if (stats.length === 0) {
-    embed.setDescription("Henüz kimse ticket kapatmamış.");
+    ticketEmbed.setDescription("Henüz kimse ticket kapatmamış.");
   } else {
     const toplam = stats.reduce((acc, s) => acc + s.count, 0);
-    embed.setDescription(
+    ticketEmbed.setDescription(
       stats
         .map((s, i) => {
           const sira = madalyalar[i] ?? `**${i + 1}.**`;
@@ -404,25 +404,33 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
         })
         .join("\n")
     );
-    embed.addFields({ name: "Toplam Kapatılan", value: `**${toplam}** ticket`, inline: true });
+    ticketEmbed.addFields({ name: "Toplam Kapatılan", value: `**${toplam}** ticket`, inline: true });
   }
+  ticketEmbed.setFooter({ text: "Destek Sistemi" });
 
   const regStats = getAllRegistrationStats();
-  if (regStats.length > 0) {
-    embed.addFields({
-      name: "📋 Kayıtlar",
-      value: regStats
+  const kayitEmbed = new EmbedBuilder()
+    .setColor(Colors.Green)
+    .setTitle("📋 Kayıt İstatistikleri")
+    .setTimestamp();
+
+  if (regStats.length === 0) {
+    kayitEmbed.setDescription("Henüz kimse kayıt yapmamış.");
+  } else {
+    const toplamKayit = regStats.reduce((acc, s) => acc + s.count, 0);
+    kayitEmbed.setDescription(
+      regStats
         .map((s, i) => {
           const sira = madalyalar[i] ?? `**${i + 1}.**`;
           return `${sira}  <@${s.userId}> — **${s.count}** kayıt`;
         })
-        .join("\n"),
-    });
+        .join("\n")
+    );
+    kayitEmbed.addFields({ name: "Toplam Kayıt", value: `**${toplamKayit}** kayıt`, inline: true });
   }
+  kayitEmbed.setFooter({ text: "Kayıt Sistemi" });
 
-  embed.setFooter({ text: "Destek Sistemi" });
-
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [ticketEmbed, kayitEmbed] });
 }
 
 export async function handleTopResetCommand(interaction: ChatInputCommandInteraction): Promise<void> {
