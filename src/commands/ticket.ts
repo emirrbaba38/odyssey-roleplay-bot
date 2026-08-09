@@ -14,6 +14,7 @@ import {
   Colors,
   GuildMember,
   Guild,
+  TextChannel,
 } from "discord.js";
 import {
   KURUCU_ROLE_NAME,
@@ -170,11 +171,15 @@ export async function handleTicketCategorySelect(
     }
 
     // Aynı kişinin, ticket kategorisi altında zaten açık bir kanalı var mı kontrolü.
+    // Kullanıcı ID'sine göre kontrol edilir (kanal izinlerinde o kişiye özel erişim var mı) —
+    // kanal adı aynı kalsa da username çakışmasından etkilenmez.
     const existingInTicketCategory = guild.channels.cache.find(
       (ch) =>
         ch.type === ChannelType.GuildText &&
         ch.parentId === ticketCategory!.id &&
-        ch.name.endsWith(`-${safeUsername}`)
+        (ch as TextChannel).permissionOverwrites.cache.some(
+          (ow) => ow.id === interaction.user.id && ow.allow.has(PermissionsBitField.Flags.ViewChannel)
+        )
     );
     if (existingInTicketCategory) {
       await interaction.editReply(`❌ Zaten açık bir ticket'ın var: <#${existingInTicketCategory.id}>`);
