@@ -13,6 +13,7 @@ import {
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
 import { registerGreeting } from "./events/greeting.js";
+import { registerInviteTracker } from "./events/invite-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
 
 const token = process.env.DISCORD_TOKEN;
@@ -27,6 +28,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildInvites,
   ],
 });
 
@@ -37,6 +39,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 registerAutoRole(client);
 registerGreeting(client);
+registerInviteTracker(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
