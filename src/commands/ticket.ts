@@ -370,18 +370,34 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
   }
 
   const stats = getAllClosedTicketStats();
+  const madalyalar = ["🥇", "🥈", "🥉"];
 
-  const embed = new EmbedBuilder().setColor(Colors.DarkAqua).setTitle("🎫 Ticket").setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor(Colors.DarkAqua)
+    .setAuthor({
+      name: interaction.guild?.name ?? "Destek Sistemi",
+      iconURL: interaction.client.user?.displayAvatarURL({ size: 256 }) ?? undefined,
+    })
+    .setTitle("🎫 Ticket İstatistikleri")
+    .setThumbnail(interaction.client.user?.displayAvatarURL({ size: 512 }) ?? null)
+    .setTimestamp();
 
   if (stats.length === 0) {
     embed.setDescription("Henüz kimse ticket kapatmamış.");
   } else {
+    const toplam = stats.reduce((acc, s) => acc + s.count, 0);
     embed.setDescription(
       stats
-        .map((s, i) => `**${i + 1}.** <@${s.userId}> — **${s.count}** ticket`)
+        .map((s, i) => {
+          const sira = madalyalar[i] ?? `**${i + 1}.**`;
+          return `${sira}  <@${s.userId}> — **${s.count}** ticket`;
+        })
         .join("\n")
     );
+    embed.addFields({ name: "Toplam Kapatılan", value: `**${toplam}** ticket`, inline: true });
   }
+
+  embed.setFooter({ text: "Destek Sistemi" });
 
   await interaction.reply({ embeds: [embed] });
 }
