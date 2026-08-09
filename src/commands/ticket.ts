@@ -388,11 +388,11 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
       name: interaction.guild?.name ?? "Destek Sistemi",
       iconURL: interaction.client.user?.displayAvatarURL({ size: 256 }) ?? undefined,
     })
-    .setTitle("🎫 Ticket İstatistikleri")
     .setThumbnail(interaction.client.user?.displayAvatarURL({ size: 512 }) ?? null)
     .setTimestamp();
 
   const parcalar: string[] = [];
+  parcalar.push("## 🎫 Ticket İstatistikleri");
 
   if (stats.length === 0) {
     parcalar.push("Henüz kimse ticket kapatmamış.");
