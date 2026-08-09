@@ -19,6 +19,8 @@ const MUSIC_URL = "https://www.youtube.com/watch?v=QTe65ySAfRY&list=PLiF7nO4rHMb
 const ANNOUNCEMENT_TEXT =
   "Şu anda kayıtlarımız kapalıdır, çok yakın zamanda açılacaktır.";
 
+const ANNOUNCEMENT_INTERVAL_MS = 20_000;
+
 type Mode = "music" | "announcement";
 
 interface RoomState {
@@ -31,6 +33,8 @@ interface RoomState {
 const activeConnections = new Map<string, RoomState>();
 // Aynı anda birden fazla bağlanma denemesini önlemek için.
 const connecting = new Set<string>();
+// key: guildId -> odada en az 1 insan olduğu sürece 20sn'de bir anons tetikleyen zamanlayıcı.
+const announcementIntervals = new Map<string, NodeJS.Timeout>();
 
 export function registerVoiceWaitingRoom(client: Client): void {
   // Bot açıldığında (ve zaten sunucularda olduğu için) hemen bağlanmayı dene.
@@ -60,14 +64,8 @@ export function registerVoiceWaitingRoom(client: Client): void {
         await tryConnectToWaitingRoom(guild.id, newState.client);
       }
 
-      const joinedWaitingChannel =
-        newState.channelId === waitingChannel.id && oldState.channelId !== waitingChannel.id;
-
-      if (joinedWaitingChannel && !newState.member?.user.bot) {
-        await playAnnouncement(guild.id).catch((err) =>
-          console.error("[kayıt-bekleme] anons çalınamadı:", err)
-        );
-      }
+      // Kanaldaki insan sayısı her değişimde yeniden değerlendirilir (giriş/çıkış).
+      evaluatePresence(guild.id, waitingChannel);
 
       // Bot Discord tarafından kanaldan atılırsa (örn. biri onu manuel sürüklerse)
       // tekrar bağlanmayı dene.
@@ -79,6 +77,35 @@ export function registerVoiceWaitingRoom(client: Client): void {
       console.error("[kayıt-bekleme] voiceStateUpdate hatası:", err);
     }
   });
+}
+
+function countHumans(channel: VoiceChannel): number {
+  return channel.members.filter((m) => !m.user.bot).size;
+}
+
+function evaluatePresence(guildId: string, waitingChannel: VoiceChannel): void {
+  const humanCount = countHumans(waitingChannel);
+
+  if (humanCount > 0) {
+    if (!announcementIntervals.has(guildId)) {
+      // Odaya ilk giren için hemen bir anons + 20sn'de bir tekrar.
+      playAnnouncement(guildId).catch((err) =>
+        console.error("[kayıt-bekleme] anons çalınamadı:", err)
+      );
+      const interval = setInterval(() => {
+        playAnnouncement(guildId).catch((err) =>
+          console.error("[kayıt-bekleme] anons çalınamadı:", err)
+        );
+      }, ANNOUNCEMENT_INTERVAL_MS);
+      announcementIntervals.set(guildId, interval);
+    }
+  } else {
+    const interval = announcementIntervals.get(guildId);
+    if (interval) {
+      clearInterval(interval);
+      announcementIntervals.delete(guildId);
+    }
+  }
 }
 
 function findWaitingChannel(guild: import("discord.js").Guild): VoiceChannel | undefined {
@@ -95,8 +122,10 @@ function createMusicResource() {
     quality: "highestaudio",
     highWaterMark: 1 << 25,
   });
-  stream.on("error", (err) => {
-    console.error("[kayıt-bekleme] ytdl akış hatası:", err);
+  stream.on("error", (err: any) => {
+    console.error(
+      `[kayıt-bekleme] ytdl akış hatası: ${err?.message ?? err} (statusCode: ${err?.statusCode ?? "?"})`
+    );
   });
   return createAudioResource(stream, { inputType: StreamType.Arbitrary });
 }
@@ -199,6 +228,7 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
     });
 
     playMusic(guildId);
+    evaluatePresence(guildId, waitingChannel);
 
     connection.on(VoiceConnectionStatus.Disconnected, async () => {
       console.warn("[kayıt-bekleme] bağlantı koptu, yeniden bağlanılıyor...");
@@ -218,6 +248,12 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
 }
 
 function cleanupConnection(guildId: string): void {
+  const interval = announcementIntervals.get(guildId);
+  if (interval) {
+    clearInterval(interval);
+    announcementIntervals.delete(guildId);
+  }
+
   const state = activeConnections.get(guildId);
   if (state) {
     try {
