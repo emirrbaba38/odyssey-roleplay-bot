@@ -13,6 +13,13 @@ import {
 import ytdl from "@distube/ytdl-core";
 import googleTTS from "google-tts-api";
 import { Readable } from "node:stream";
+import { existsSync, createReadStream } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Repoya bir müzik dosyası eklenirse (örn. assets/waiting-music.mp3), YouTube'a hiç gidilmez.
+const LOCAL_MUSIC_PATH = join(__dirname, "..", "..", "assets", "waiting-music.mp3");
 
 const WAITING_VOICE_CHANNEL_NAME = "Kayıt Bekleme";
 const MUSIC_URL = "https://www.youtube.com/watch?v=QTe65ySAfRY&list=PLiF7nO4rHMbPjauQWeDJqi2G7g2Ybs3Xr&index=2";
@@ -20,6 +27,8 @@ const ANNOUNCEMENT_TEXT =
   "Şu anda kayıtlarımız kapalıdır, çok yakın zamanda açılacaktır.";
 
 const ANNOUNCEMENT_INTERVAL_MS = 20_000;
+const MUSIC_RETRY_BASE_MS = 10_000;
+const MUSIC_RETRY_MAX_MS = 120_000;
 
 type Mode = "music" | "announcement";
 
@@ -35,6 +44,10 @@ const activeConnections = new Map<string, RoomState>();
 const connecting = new Set<string>();
 // key: guildId -> odada en az 1 insan olduğu sürece 20sn'de bir anons tetikleyen zamanlayıcı.
 const announcementIntervals = new Map<string, NodeJS.Timeout>();
+// key: guildId -> art arda kaç kez müzik başlatma denemesi başarısız oldu (backoff için).
+const musicFailureCounts = new Map<string, number>();
+// key: guildId -> bekleyen bir retry zamanlayıcısı var mı (üst üste retry planlamayı önlemek için).
+const musicRetryTimers = new Map<string, NodeJS.Timeout>();
 
 export function registerVoiceWaitingRoom(client: Client): void {
   // Bot açıldığında (ve zaten sunucularda olduğu için) hemen bağlanmayı dene.
@@ -117,6 +130,14 @@ function findWaitingChannel(guild: import("discord.js").Guild): VoiceChannel | u
 }
 
 function createMusicResource() {
+  if (existsSync(LOCAL_MUSIC_PATH)) {
+    const stream = createReadStream(LOCAL_MUSIC_PATH);
+    stream.on("error", (err) => {
+      console.error("[kayıt-bekleme] yerel müzik dosyası okunamadı:", err);
+    });
+    return createAudioResource(stream, { inputType: StreamType.Arbitrary });
+  }
+
   const stream = ytdl(MUSIC_URL, {
     filter: "audioonly",
     quality: "highestaudio",
@@ -154,7 +175,27 @@ function playMusic(guildId: string): void {
     state.player.play(resource);
   } catch (err) {
     console.error("[kayıt-bekleme] müzik başlatılamadı:", err);
+    scheduleMusicRetry(guildId);
   }
+}
+
+// Art arda başarısız denemelerde YouTube'u/log'ları spamlememek için artan bekleme süresiyle tekrar dener.
+function scheduleMusicRetry(guildId: string): void {
+  if (musicRetryTimers.has(guildId)) return; // zaten bekleyen bir retry var
+
+  const failures = (musicFailureCounts.get(guildId) ?? 0) + 1;
+  musicFailureCounts.set(guildId, failures);
+
+  const delay = Math.min(MUSIC_RETRY_BASE_MS * 2 ** (failures - 1), MUSIC_RETRY_MAX_MS);
+  console.warn(
+    `[kayıt-bekleme] müzik ${failures}. kez başarısız oldu, ${Math.round(delay / 1000)}sn sonra tekrar denenecek.`
+  );
+
+  const timer = setTimeout(() => {
+    musicRetryTimers.delete(guildId);
+    playMusic(guildId);
+  }, delay);
+  musicRetryTimers.set(guildId, timer);
 }
 
 async function playAnnouncement(guildId: string): Promise<void> {
@@ -204,27 +245,18 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
 
     player.on(AudioPlayerStatus.Playing, () => {
       console.log(`[kayıt-bekleme] ▶️ çalıyor (mod: ${state.mode}).`);
+      musicFailureCounts.delete(guildId);
     });
 
-    // Bir kaynak bitince: anonstan sonra müziğe dön, müzik bitince müziği yeniden başlat.
+    // Bir kaynak bitince (anons ya da müzik), sırada müzik çalsın.
     player.on(AudioPlayerStatus.Idle, () => {
-      const current = activeConnections.get(guildId);
-      if (!current) return;
-      if (current.mode === "announcement") {
-        playMusic(guildId);
-      } else {
-        try {
-          const nextResource = createMusicResource();
-          current.player.play(nextResource);
-        } catch (err) {
-          console.error("[kayıt-bekleme] müzik tekrar başlatılamadı:", err);
-        }
-      }
+      if (!activeConnections.has(guildId)) return;
+      playMusic(guildId);
     });
 
     player.on("error", (err) => {
-      console.error("[kayıt-bekleme] audio player hatası, müziğe dönülüyor:", err);
-      playMusic(guildId);
+      console.error("[kayıt-bekleme] audio player hatası:", err);
+      scheduleMusicRetry(guildId);
     });
 
     playMusic(guildId);
@@ -253,6 +285,13 @@ function cleanupConnection(guildId: string): void {
     clearInterval(interval);
     announcementIntervals.delete(guildId);
   }
+
+  const retryTimer = musicRetryTimers.get(guildId);
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    musicRetryTimers.delete(guildId);
+  }
+  musicFailureCounts.delete(guildId);
 
   const state = activeConnections.get(guildId);
   if (state) {
