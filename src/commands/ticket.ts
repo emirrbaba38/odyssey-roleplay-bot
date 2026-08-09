@@ -64,7 +64,7 @@ function sanitizeForChannelName(input: string): string {
 export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | null) {
   const embed = new EmbedBuilder()
     .setColor(Colors.DarkAqua)
-    .setAuthor({ name: guild.name, iconURL: guild.iconURL() ?? undefined })
+    .setAuthor({ name: guild.name, iconURL: botAvatarURL ?? undefined })
     .setTitle("🎫 Destek Merkezine Hoş Geldin")
     .setDescription(
       "Aşağıdaki menüden talebine en uygun kategoriyi seçerek sana özel bir destek kanalı açabilirsin.\n\n" +
