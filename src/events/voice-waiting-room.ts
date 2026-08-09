@@ -34,7 +34,7 @@ export function registerVoiceWaitingRoom(client: Client): void {
       const waitingChannel = guild.channels.cache.find(
         (ch) =>
           ch.type === ChannelType.GuildVoice &&
-          ch.name.toLowerCase() === WAITING_VOICE_CHANNEL_NAME.toLowerCase()
+          ch.name.toLowerCase().startsWith(WAITING_VOICE_CHANNEL_NAME.toLowerCase())
       ) as VoiceChannel | undefined;
 
       if (!waitingChannel) return;
