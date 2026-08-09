@@ -4,8 +4,10 @@ import {
   handleTicketPanelCommand,
   handleTicketCategorySelect,
   handleTicketCloseButton,
+  handleTicketClaimButton,
   TICKET_SELECT_ID,
   TICKET_CLOSE_PREFIX,
+  TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
 
 const token = process.env.DISCORD_TOKEN;
@@ -42,7 +44,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleTicketCategorySelect(interaction);
       }
     } else if (interaction.isButton()) {
-      if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
+      if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
+        await handleTicketClaimButton(interaction);
+      } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseButton(interaction);
       }
     }
