@@ -345,6 +345,15 @@ export async function handleTicketCloseButton(interaction: ButtonInteraction): P
     return;
   }
 
+  const claimedBy = ticketClaims.get(interaction.channelId);
+  if (claimedBy && claimedBy !== interaction.user.id) {
+    await interaction.reply({
+      content: `❌ Bu ticket'ı sadece sahiplenen yetkili <@${claimedBy}> kapatabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
   ticketClaims.delete(interaction.channelId);
   incrementClosedTicket(interaction.user.id);
 
