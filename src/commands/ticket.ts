@@ -382,7 +382,7 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
   const stats = getAllClosedTicketStats();
   const madalyalar = ["🥇", "🥈", "🥉"];
 
-  const ticketEmbed = new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(Colors.DarkAqua)
     .setAuthor({
       name: interaction.guild?.name ?? "Destek Sistemi",
@@ -392,45 +392,40 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
     .setThumbnail(interaction.client.user?.displayAvatarURL({ size: 512 }) ?? null)
     .setTimestamp();
 
+  const parcalar: string[] = [];
+
   if (stats.length === 0) {
-    ticketEmbed.setDescription("Henüz kimse ticket kapatmamış.");
+    parcalar.push("Henüz kimse ticket kapatmamış.");
   } else {
     const toplam = stats.reduce((acc, s) => acc + s.count, 0);
-    ticketEmbed.setDescription(
-      stats
-        .map((s, i) => {
-          const sira = madalyalar[i] ?? `**${i + 1}.**`;
-          return `${sira}  <@${s.userId}> — **${s.count}** ticket`;
-        })
-        .join("\n")
-    );
-    ticketEmbed.addFields({ name: "Toplam Kapatılan", value: `**${toplam}** ticket`, inline: true });
+    const ticketListesi = stats
+      .map((s, i) => {
+        const sira = madalyalar[i] ?? `**${i + 1}.**`;
+        return `${sira}  <@${s.userId}> — **${s.count}** ticket`;
+      })
+      .join("\n");
+    parcalar.push(`${ticketListesi}\n\n**Toplam Kapatılan:** ${toplam} ticket`);
   }
-  ticketEmbed.setFooter({ text: "Destek Sistemi" });
 
   const regStats = getAllRegistrationStats();
-  const kayitEmbed = new EmbedBuilder()
-    .setColor(Colors.Green)
-    .setTitle("📋 Kayıt İstatistikleri")
-    .setTimestamp();
-
+  parcalar.push("## 📋 Kayıt İstatistikleri");
   if (regStats.length === 0) {
-    kayitEmbed.setDescription("Henüz kimse kayıt yapmamış.");
+    parcalar.push("Henüz kimse kayıt yapmamış.");
   } else {
     const toplamKayit = regStats.reduce((acc, s) => acc + s.count, 0);
-    kayitEmbed.setDescription(
-      regStats
-        .map((s, i) => {
-          const sira = madalyalar[i] ?? `**${i + 1}.**`;
-          return `${sira}  <@${s.userId}> — **${s.count}** kayıt`;
-        })
-        .join("\n")
-    );
-    kayitEmbed.addFields({ name: "Toplam Kayıt", value: `**${toplamKayit}** kayıt`, inline: true });
+    const kayitListesi = regStats
+      .map((s, i) => {
+        const sira = madalyalar[i] ?? `**${i + 1}.**`;
+        return `${sira}  <@${s.userId}> — **${s.count}** kayıt`;
+      })
+      .join("\n");
+    parcalar.push(`${kayitListesi}\n\n**Toplam Kayıt:** ${toplamKayit} kayıt`);
   }
-  kayitEmbed.setFooter({ text: "Kayıt Sistemi" });
 
-  await interaction.reply({ embeds: [ticketEmbed, kayitEmbed] });
+  embed.setDescription(parcalar.join("\n\n"));
+  embed.setFooter({ text: "Destek Sistemi" });
+
+  await interaction.reply({ embeds: [embed] });
 }
 
 export async function handleTopResetCommand(interaction: ChatInputCommandInteraction): Promise<void> {
