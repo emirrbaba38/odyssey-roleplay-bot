@@ -19,8 +19,11 @@ import {
   KURUCU_ROLE_NAME,
   TICKET_STAFF_ROLE_NAME,
   YONETIM_SEFI_ROLE_NAME,
-  memberHasRoleNamed,
-  findRoleByName,
+  KURUCU_ROLE_ID,
+  TICKET_STAFF_ROLE_ID,
+  YONETIM_SEFI_ROLE_ID,
+  memberHasRoleId,
+  findRoleById,
 } from "../lib/permissions.js";
 import {
   incrementClosedTicket,
@@ -116,7 +119,7 @@ export async function handleTicketPanelCommand(
     return;
   }
 
-  if (!memberHasRoleNamed(executor as GuildMember, KURUCU_ROLE_NAME)) {
+  if (!memberHasRoleId(executor as GuildMember, KURUCU_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu komutu sadece **${KURUCU_ROLE_NAME}** kullanabilir.`,
       ephemeral: true,
@@ -148,7 +151,7 @@ export async function handleTicketCategorySelect(
       return;
     }
 
-    const ticketStaffRole = findRoleByName(guild, TICKET_STAFF_ROLE_NAME);
+    const ticketStaffRole = findRoleById(guild, TICKET_STAFF_ROLE_ID);
     const safeUsername = sanitizeForChannelName(interaction.user.username);
     const channelName = `${category.value}-${safeUsername}`.slice(0, 100);
 
@@ -272,7 +275,7 @@ export async function handleTicketClaimButton(interaction: ButtonInteraction): P
     return;
   }
 
-  if (!memberHasRoleNamed(member as GuildMember, TICKET_STAFF_ROLE_NAME)) {
+  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** sahiplenebilir.`,
       ephemeral: true,
@@ -338,7 +341,7 @@ export async function handleTicketCloseButton(interaction: ButtonInteraction): P
     return;
   }
 
-  const isTicketStaff = memberHasRoleNamed(member as GuildMember, TICKET_STAFF_ROLE_NAME);
+  const isTicketStaff = memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID);
 
   if (!isTicketStaff) {
     await interaction.reply({
@@ -373,7 +376,7 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
     return;
   }
 
-  if (!memberHasRoleNamed(member as GuildMember, YONETIM_SEFI_ROLE_NAME)) {
+  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
       ephemeral: true,
@@ -437,7 +440,7 @@ export async function handleTopResetCommand(interaction: ChatInputCommandInterac
     return;
   }
 
-  if (!memberHasRoleNamed(member as GuildMember, YONETIM_SEFI_ROLE_NAME)) {
+  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
       ephemeral: true,

@@ -1,9 +1,10 @@
 import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember } from "discord.js";
 import {
   YETKILI_EKIBI_ROLE_NAME,
+  YETKILI_EKIBI_ROLE_ID,
   NEW_PLAYER_ROLE_NAME,
   WHITELIST_ROLE_NAME,
-  memberHasRoleNamed,
+  memberHasRoleId,
   findRoleByName,
 } from "../lib/permissions.js";
 import { incrementRegistration } from "../lib/registration-stats.js";
@@ -16,7 +17,7 @@ export async function handleKayitCommand(interaction: ChatInputCommandInteractio
     return;
   }
 
-  if (!memberHasRoleNamed(executor as GuildMember, YETKILI_EKIBI_ROLE_NAME)) {
+  if (!memberHasRoleId(executor as GuildMember, YETKILI_EKIBI_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu komutu sadece **${YETKILI_EKIBI_ROLE_NAME}** kullanabilir.`,
       ephemeral: true,
