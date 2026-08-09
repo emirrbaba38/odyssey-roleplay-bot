@@ -41,12 +41,10 @@ client.once(Events.ClientReady, async (readyClient) => {
   await registerCommands(client);
 
   try {
-    if (!readyClient.user.banner) {
-      const bannerPath = join(__dirname, "..", "assets", "banner.gif");
-      const bannerBuffer = readFileSync(bannerPath);
-      await readyClient.user.setBanner(bannerBuffer);
-      console.log("🖼️ Bot banner'ı ayarlandı.");
-    }
+    const bannerPath = join(__dirname, "..", "assets", "banner.gif");
+    const bannerBuffer = readFileSync(bannerPath);
+    await readyClient.user.setBanner(bannerBuffer);
+    console.log("🖼️ Bot banner'ı ayarlandı.");
   } catch (err) {
     console.error("⚠️ Banner ayarlanamadı:", err);
   }
