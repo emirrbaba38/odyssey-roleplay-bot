@@ -10,6 +10,7 @@ import {
   TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
+import { registerGreeting } from "./events/greeting.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -32,6 +33,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 registerAutoRole(client);
+registerGreeting(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
