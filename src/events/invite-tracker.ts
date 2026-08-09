@@ -42,7 +42,11 @@ export function registerInviteTracker(client: Client): void {
         return;
       }
 
-      await logKanal.send({ embeds: [embed] });
+      await logKanal.send({
+        content: `${member}`,
+        embeds: [embed],
+        allowedMentions: { users: [member.id] },
+      });
     } catch (err) {
       console.error("[katilim] üye katılımı işlenirken hata:", err);
     }
