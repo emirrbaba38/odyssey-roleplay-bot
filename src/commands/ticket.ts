@@ -190,6 +190,20 @@ export async function handleTicketCategorySelect(
         ],
       });
     }
+    // Botun kendisine de görünürlük vermezsek, kanal oluşuyor ama bot kendi
+    // hoş geldin mesajını gönderemiyor ("Missing Access" hatası buradan geliyordu).
+    const botUserId = interaction.client.user?.id;
+    if (botUserId) {
+      overwrites.push({
+        id: botUserId,
+        allow: [
+          PermissionsBitField.Flags.ViewChannel,
+          PermissionsBitField.Flags.SendMessages,
+          PermissionsBitField.Flags.ReadMessageHistory,
+          PermissionsBitField.Flags.ManageChannels,
+        ],
+      });
+    }
 
     const ticketChannel = await guild.channels.create({
       name: channelName,
