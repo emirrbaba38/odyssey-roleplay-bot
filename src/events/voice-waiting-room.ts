@@ -30,8 +30,10 @@ const WAITING_VOICE_CHANNEL_NAME = "Kayıt Bekleme";
 const MUSIC_URL = "https://www.youtube.com/watch?v=QTe65ySAfRY&list=PLiF7nO4rHMbPjauQWeDJqi2G7g2Ybs3Xr&index=2";
 const ANNOUNCEMENT_TEXT =
   "Şu anda kayıtlarımız kapalıdır, çok yakın zamanda açılacaktır.";
-// Anons sırasında müziğin kısılacağı ses seviyesi (0-1 arası, 1 = tam ses).
-const MUSIC_DUCK_VOLUME = 0.25;
+// Not: müzik artık sabit bir "duck volume" ile değil, ffmpeg'in sidechaincompress
+// filtresiyle otomatik kısılıp açılıyor (bkz. createMixedAnnouncementResource).
+// Konuşma bittiğinde YENİ bir process başlatmaya gerek kalmıyor, aynı akış
+// kesintisiz devam ediyor — bu da anons sonrası duyulan "kesilme"yi ortadan kaldırıyor.
 
 const ANNOUNCEMENT_INTERVAL_MS = 20_000;
 const MUSIC_RETRY_BASE_MS = 10_000;
@@ -169,16 +171,28 @@ function createMusicResourceFromYoutube(): AudioResource {
   return createAudioResource(stream, { inputType: StreamType.Arbitrary });
 }
 
-// Anonsu + müziği (kısık ses) aynı anda mixleyip tek bir Ogg/Opus akışı olarak üretir.
-// Çıktının uzunluğu anonsun uzunluğu kadardır (duration=first).
+// Müziği ve anonsu TEK bir sürekli akışta mixler: sidechaincompress filtresi,
+// konuşma sesi geldiğinde müziği otomatik kısar, konuşma bitince otomatik ve
+// yumuşak şekilde tekrar tam sese çıkarır. Anons bittikten sonra akış durmaz —
+// aynı process, kalan müzik dosyasını normal sesle çalmaya devam eder
+// (duration=first, süreyi mixlenen müzik dalına göre belirler, anonsa göre değil).
+// Böylece "konuşma bitince yeni process başlat" adımı tamamen ortadan kalkar
+// ve bu geçişte yaşanan sessizlik/kesilme sorunu çözülür.
 function createMixedAnnouncementResource(offsetMs: number, announcementFilePath: string): AudioResource {
   const offsetSeconds = Math.max(0, offsetMs / 1000).toFixed(2);
   const proc = spawnFfmpeg([
-    "-i", announcementFilePath,
     "-ss", offsetSeconds,
     "-i", LOCAL_MUSIC_PATH,
+    "-i", announcementFilePath,
     "-filter_complex",
-    `[0:a]aresample=48000[a0];[1:a]aresample=48000,volume=${MUSIC_DUCK_VOLUME}[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+    // apad ÖNEMLİ: sidechaincompress iki girişten kısa olanının süresine göre
+    // kesiyor. apad olmadan konuşma (birkaç sn) bitince ducked müzik dalı da
+    // orada kesilir. Konuşmayı sessizlikle sona kadar uzatarak, kesme kararını
+    // tamamen müzik dalının (amix duration=first) uzunluğuna bırakıyoruz.
+    "[0:a]aformat=sample_rates=48000:channel_layouts=stereo[music];" +
+      "[1:a]aformat=sample_rates=48000:channel_layouts=stereo,apad,asplit=2[speech1][speech2];" +
+      "[music][speech1]sidechaincompress=threshold=0.05:ratio=20:attack=5:release=1000:makeup=2[ducked];" +
+      "[ducked][speech2]amix=inputs=2:duration=first:dropout_transition=0[aout]",
     "-map", "[aout]",
     "-c:a", "libopus",
     "-f", "ogg",
@@ -224,9 +238,10 @@ function scheduleMusicRetry(guildId: string): void {
 async function playAnnouncement(guildId: string): Promise<void> {
   const state = activeConnections.get(guildId);
   if (!state) return;
-  if (state.mode === "announcement") return; // zaten çalıyor, üst üste tetikleme
 
-  // Müziğin şu ana kadar ilerlediği kısmı offset'e ekle (kaldığımız yeri işaretle).
+  // Şu ana kadarki resource ne kadar ilerlediyse offset'e ekle (kaldığımız yeri işaretle).
+  // Not: artık "mode === announcement ise çık" kontrolü yok — her 20sn'de bir, o an çalan
+  // akışın üstüne yeni bir anons katmanı ekleniyor; müzik hiçbir zaman durmuyor.
   const playedSoFar = state.currentResource?.playbackDuration ?? 0;
   state.offsetMs += playedSoFar;
 
@@ -252,8 +267,10 @@ async function playAnnouncement(guildId: string): Promise<void> {
   const tmpPath = join(tmpdir(), `announcement-${guildId}.mp3`);
   await writeFile(tmpPath, buffer);
 
+  // Bu resource, konuşma bitince OTOMATİK olarak (aynı process içinde) normal
+  // sesle müziğe döner — bu yüzden mode'u baştan "music" olarak işaretliyoruz.
   const resource = createMixedAnnouncementResource(state.offsetMs, tmpPath);
-  state.mode = "announcement";
+  state.mode = "music";
   state.currentResource = resource;
   state.player.play(resource);
 }
@@ -312,20 +329,14 @@ async function tryConnectToWaitingRoom(guildId: string, client: Client): Promise
       musicFailureCounts.delete(guildId);
     });
 
-    // Bir segment doğal olarak biterse: anonstan sonra offset'i ilerletip müziğe dön,
-    // düz müzik dosyanın sonuna gelirse başa sar.
+    // Idle sadece müzik dosyasının gerçekten sonuna gelindiğinde (veya bir hata
+    // sonrası akış tükendiğinde) tetiklenir — anons bitişinde TETİKLENMEZ, çünkü
+    // createMixedAnnouncementResource anons sonrası aynı akışta müziğe devam eder.
     player.on(AudioPlayerStatus.Idle, () => {
       const current = activeConnections.get(guildId);
       if (!current) return;
-
-      if (current.mode === "announcement") {
-        const played = current.currentResource?.playbackDuration ?? 0;
-        current.offsetMs += played;
-        playMusic(guildId);
-      } else {
-        current.offsetMs = 0; // dosya sonuna ulaşıldı, başa sar
-        playMusic(guildId);
-      }
+      current.offsetMs = 0; // dosya sonuna ulaşıldı, başa sar
+      playMusic(guildId);
     });
 
     player.on("error", (err) => {
