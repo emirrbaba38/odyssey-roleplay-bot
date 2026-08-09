@@ -15,6 +15,7 @@ import {
   TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
+import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
 import { registerGreeting } from "./events/greeting.js";
 import { registerInviteTracker } from "./events/invite-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
@@ -66,6 +67,7 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 registerAutoRole(client);
+registerVoiceWaitingRoom(client);
 registerGreeting(client);
 registerInviteTracker(client);
 
@@ -108,4 +110,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(token);
+// Beklenmeyen hatalarda process'in sessizce çökmesini önle (bot "çevrimdışı" görünmesin diye).
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ Yakalanmamış promise hatası:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠️ Yakalanmamış istisna:", err);
+});
+
+client.login(token).catch((err) => {
+  console.error("❌ Bota giriş yapılamadı:", err);
+  process.exit(1);
+});
