@@ -10,6 +10,7 @@ import {
   TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
+import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -23,6 +24,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
@@ -32,6 +34,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 registerAutoRole(client);
+registerVoiceWaitingRoom(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
