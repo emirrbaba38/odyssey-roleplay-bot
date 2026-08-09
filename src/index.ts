@@ -1,4 +1,7 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { registerCommands, registerCommandsForGuild } from "./deploy-commands.js";
 import {
   handleTicketPanelCommand,
@@ -16,6 +19,8 @@ import { registerGreeting } from "./events/greeting.js";
 import { registerInviteTracker } from "./events/invite-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
   console.error("❌ DISCORD_TOKEN ortam değişkeni tanımlı değil.");
@@ -31,16 +36,15 @@ const client = new Client({
   ],
 });
 
-const BOT_BANNER_URL =
-  "https://cdn.discordapp.com/attachments/1348342995321356348/1535948198710087711/gorselde_ki_ates_yansn_boyle.gif?ex=6a799ebb&is=6a784d3b&hm=0bcb15184001f34b94d1192eb86a4f2c1db46ed3c2a9d0766773c796c3197610&";
-
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`✅ Giriş yapıldı: ${readyClient.user.tag}`);
   await registerCommands(client);
 
   try {
     if (!readyClient.user.banner) {
-      await readyClient.user.setBanner(BOT_BANNER_URL);
+      const bannerPath = join(__dirname, "..", "assets", "banner.gif");
+      const bannerBuffer = readFileSync(bannerPath);
+      await readyClient.user.setBanner(bannerBuffer);
       console.log("🖼️ Bot banner'ı ayarlandı.");
     }
   } catch (err) {
