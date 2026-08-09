@@ -48,6 +48,15 @@ client.once(Events.ClientReady, async (readyClient) => {
   } catch (err) {
     console.error("⚠️ Banner ayarlanamadı:", err);
   }
+
+  try {
+    const avatarPath = join(__dirname, "..", "assets", "avatar.gif");
+    const avatarBuffer = readFileSync(avatarPath);
+    await readyClient.user.setAvatar(avatarBuffer);
+    console.log("🖼️ Bot avatarı ayarlandı.");
+  } catch (err) {
+    console.error("⚠️ Avatar ayarlanamadı:", err);
+  }
 });
 
 client.on(Events.GuildCreate, async (guild) => {
