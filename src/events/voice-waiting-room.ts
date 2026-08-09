@@ -12,24 +12,20 @@ import {
   AudioResource,
 } from "@discordjs/voice";
 import ytdl from "@distube/ytdl-core";
-import googleTTS from "google-tts-api";
-import { Readable } from "node:stream";
-import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { createReadStream, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Repoya eklenen müzik dosyası (assets/waiting-music.mp3), YouTube'a hiç gidilmez.
 const LOCAL_MUSIC_PATH = join(__dirname, "..", "..", "assets", "waiting-music.mp3");
+// Kayıtların kapalı olduğunu bildiren gerçek ses kaydı (artık TTS yerine bu kullanılıyor).
+const ANNOUNCEMENT_AUDIO_PATH = join(__dirname, "..", "..", "assets", "kayit-anons.mp3");
 
 const WAITING_VOICE_CHANNEL_NAME = "Kayıt Bekleme";
 const MUSIC_URL = "https://www.youtube.com/watch?v=QTe65ySAfRY&list=PLiF7nO4rHMbPjauQWeDJqi2G7g2Ybs3Xr&index=2";
-const ANNOUNCEMENT_TEXT =
-  "Şu anda kayıtlarımız kapalıdır, çok yakın zamanda açılacaktır.";
 // Not: müzik artık sabit bir "duck volume" ile değil, ffmpeg'in sidechaincompress
 // filtresiyle otomatik kısılıp açılıyor (bkz. createMixedAnnouncementResource).
 // Konuşma bittiğinde YENİ bir process başlatmaya gerek kalmıyor, aynı akış
@@ -245,48 +241,30 @@ async function playAnnouncement(guildId: string): Promise<void> {
   const playedSoFar = state.currentResource?.playbackDuration ?? 0;
   state.offsetMs += playedSoFar;
 
+  if (!existsSync(ANNOUNCEMENT_AUDIO_PATH)) {
+    console.warn(`[kayıt-bekleme] anons ses dosyası bulunamadı: ${ANNOUNCEMENT_AUDIO_PATH}`);
+    return;
+  }
+
   if (!existsSync(LOCAL_MUSIC_PATH)) {
-    // Yerel dosya yoksa mixleme yapılamaz, eski davranış: TTS'i tek başına çal.
-    const resource = await createPlainAnnouncementResource();
+    // Yerel müzik dosyası yoksa mixleme yapılamaz, eski davranış: anonsu tek başına çal.
+    const resource = createPlainAnnouncementResource();
     state.mode = "announcement";
     state.currentResource = resource;
     state.player.play(resource);
     return;
   }
 
-  const ttsUrl = googleTTS.getAudioUrl(ANNOUNCEMENT_TEXT, {
-    lang: "tr",
-    slow: false,
-    host: "https://translate.google.com",
-  });
-  const res = await fetch(ttsUrl);
-  if (!res.ok) {
-    throw new Error(`TTS indirilemedi: ${res.status}`);
-  }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const tmpPath = join(tmpdir(), `announcement-${guildId}.mp3`);
-  await writeFile(tmpPath, buffer);
-
   // Bu resource, konuşma bitince OTOMATİK olarak (aynı process içinde) normal
   // sesle müziğe döner — bu yüzden mode'u baştan "music" olarak işaretliyoruz.
-  const resource = createMixedAnnouncementResource(state.offsetMs, tmpPath);
+  const resource = createMixedAnnouncementResource(state.offsetMs, ANNOUNCEMENT_AUDIO_PATH);
   state.mode = "music";
   state.currentResource = resource;
   state.player.play(resource);
 }
 
-async function createPlainAnnouncementResource(): Promise<AudioResource> {
-  const url = googleTTS.getAudioUrl(ANNOUNCEMENT_TEXT, {
-    lang: "tr",
-    slow: false,
-    host: "https://translate.google.com",
-  });
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`TTS indirilemedi: ${res.status}`);
-  }
-  const buffer = Buffer.from(await res.arrayBuffer());
-  const stream = Readable.from(buffer);
+function createPlainAnnouncementResource(): AudioResource {
+  const stream = createReadStream(ANNOUNCEMENT_AUDIO_PATH);
   return createAudioResource(stream, { inputType: StreamType.Arbitrary });
 }
 
