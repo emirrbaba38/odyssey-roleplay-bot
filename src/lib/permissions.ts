@@ -1,7 +1,7 @@
 import { ChannelType, Guild, GuildMember, TextChannel } from "discord.js";
 
 export const STAFF_ROLE_NAME = "Yetkili";
-export const KURUCU_ROLE_NAME = "Kurucu";
+export const KURUCU_ROLE_NAME = "🔱・Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";
 export const YONETIM_SEFI_ROLE_NAME = "🔷・Yönetim Şefi";
 export const YETKILI_EKIBI_ROLE_NAME = "Yetkili Ekibi";
