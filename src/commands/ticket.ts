@@ -14,13 +14,24 @@ import {
   Colors,
   GuildMember,
   Guild,
+  TextChannel,
 } from "discord.js";
 import {
   KURUCU_ROLE_NAME,
   TICKET_STAFF_ROLE_NAME,
-  memberHasRoleNamed,
-  findRoleByName,
+  YONETIM_SEFI_ROLE_NAME,
+  KURUCU_ROLE_ID,
+  TICKET_STAFF_ROLE_ID,
+  YONETIM_SEFI_ROLE_ID,
+  memberHasRoleId,
+  findRoleById,
 } from "../lib/permissions.js";
+import {
+  incrementClosedTicket,
+  getAllClosedTicketStats,
+  resetClosedTicketStats,
+} from "../lib/ticket-stats.js";
+import { getAllRegistrationStats, resetRegistrationStats } from "../lib/registration-stats.js";
 
 export const TICKET_SELECT_ID = "ticket_category_select";
 export const TICKET_CLOSE_PREFIX = "ticket_close_";
@@ -64,7 +75,7 @@ function sanitizeForChannelName(input: string): string {
 export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | null) {
   const embed = new EmbedBuilder()
     .setColor(Colors.DarkAqua)
-    .setAuthor({ name: guild.name, iconURL: guild.iconURL() ?? undefined })
+    .setAuthor({ name: guild.name, iconURL: botAvatarURL ?? undefined })
     .setTitle("🎫 Destek Merkezine Hoş Geldin")
     .setDescription(
       "Aşağıdaki menüden talebine en uygun kategoriyi seçerek sana özel bir destek kanalı açabilirsin.\n\n" +
@@ -72,7 +83,9 @@ export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | nul
         "▫️ Kanalı sadece **sen** ve **Ticket Yetkilisi** ekibimiz görebilir\n" +
         "▫️ İşin bitince ticket'ı kendin de kapatabilirsin"
     )
-    .setImage(botAvatarURL)
+    .setImage(
+      "https://cdn.discordapp.com/attachments/1348342995321356348/1535948198710087711/gorselde_ki_ates_yansn_boyle.gif?ex=6a799ebb&is=6a784d3b&hm=0bcb15184001f34b94d1192eb86a4f2c1db46ed3c2a9d0766773c796c3197610&"
+    )
     .setFooter({ text: "Destek Sistemi" })
     .setTimestamp();
 
@@ -107,7 +120,7 @@ export async function handleTicketPanelCommand(
     return;
   }
 
-  if (!memberHasRoleNamed(executor as GuildMember, KURUCU_ROLE_NAME)) {
+  if (!memberHasRoleId(executor as GuildMember, KURUCU_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu komutu sadece **${KURUCU_ROLE_NAME}** kullanabilir.`,
       ephemeral: true,
@@ -139,7 +152,7 @@ export async function handleTicketCategorySelect(
       return;
     }
 
-    const ticketStaffRole = findRoleByName(guild, TICKET_STAFF_ROLE_NAME);
+    const ticketStaffRole = findRoleById(guild, TICKET_STAFF_ROLE_ID);
     const safeUsername = sanitizeForChannelName(interaction.user.username);
     const channelName = `${category.value}-${safeUsername}`.slice(0, 100);
 
@@ -158,11 +171,15 @@ export async function handleTicketCategorySelect(
     }
 
     // Aynı kişinin, ticket kategorisi altında zaten açık bir kanalı var mı kontrolü.
+    // Kullanıcı ID'sine göre kontrol edilir (kanal izinlerinde o kişiye özel erişim var mı) —
+    // kanal adı aynı kalsa da username çakışmasından etkilenmez.
     const existingInTicketCategory = guild.channels.cache.find(
       (ch) =>
         ch.type === ChannelType.GuildText &&
         ch.parentId === ticketCategory!.id &&
-        ch.name.endsWith(`-${safeUsername}`)
+        (ch as TextChannel).permissionOverwrites.cache.some(
+          (ow) => ow.id === interaction.user.id && ow.allow.has(PermissionsBitField.Flags.ViewChannel)
+        )
     );
     if (existingInTicketCategory) {
       await interaction.editReply(`❌ Zaten açık bir ticket'ın var: <#${existingInTicketCategory.id}>`);
@@ -263,7 +280,7 @@ export async function handleTicketClaimButton(interaction: ButtonInteraction): P
     return;
   }
 
-  if (!memberHasRoleNamed(member as GuildMember, TICKET_STAFF_ROLE_NAME)) {
+  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
     await interaction.reply({
       content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** sahiplenebilir.`,
       ephemeral: true,
@@ -329,22 +346,114 @@ export async function handleTicketCloseButton(interaction: ButtonInteraction): P
     return;
   }
 
-  const openedById = interaction.customId.slice(TICKET_CLOSE_PREFIX.length);
-  const isOwner = interaction.user.id === openedById;
-  const isTicketStaff = memberHasRoleNamed(member as GuildMember, TICKET_STAFF_ROLE_NAME);
+  const isTicketStaff = memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID);
 
-  if (!isOwner && !isTicketStaff) {
+  if (!isTicketStaff) {
     await interaction.reply({
-      content: `❌ Bu ticket'ı sadece açan kişi veya **${TICKET_STAFF_ROLE_NAME}** kapatabilir.`,
+      content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** kapatabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const claimedBy = ticketClaims.get(interaction.channelId);
+  if (claimedBy && claimedBy !== interaction.user.id) {
+    await interaction.reply({
+      content: `❌ Bu ticket'ı sadece sahiplenen yetkili <@${claimedBy}> kapatabilir.`,
       ephemeral: true,
     });
     return;
   }
 
   ticketClaims.delete(interaction.channelId);
+  incrementClosedTicket(interaction.user.id);
 
   await interaction.reply("🔒 Bu ticket 5 saniye içinde kapatılacak...");
   setTimeout(async () => {
     await interaction.channel?.delete().catch(() => {});
   }, 5000);
+}
+
+export async function handleTopAllCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const member = interaction.member;
+  if (!member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu komut sadece sunucu içinde kullanılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
+    await interaction.reply({
+      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const stats = getAllClosedTicketStats();
+  const madalyalar = ["🥇", "🥈", "🥉"];
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.DarkAqua)
+    .setAuthor({
+      name: interaction.guild?.name ?? "Destek Sistemi",
+      iconURL: interaction.client.user?.displayAvatarURL({ size: 256 }) ?? undefined,
+    })
+    .setThumbnail(interaction.client.user?.displayAvatarURL({ size: 512 }) ?? null)
+    .setTimestamp();
+
+  const parcalar: string[] = [];
+  parcalar.push("## 🎫 Ticket İstatistikleri");
+
+  if (stats.length === 0) {
+    parcalar.push("Henüz kimse ticket kapatmamış.");
+  } else {
+    const toplam = stats.reduce((acc, s) => acc + s.count, 0);
+    const ticketListesi = stats
+      .map((s, i) => {
+        const sira = madalyalar[i] ?? `**${i + 1}.**`;
+        return `${sira}  <@${s.userId}> — **${s.count}** ticket`;
+      })
+      .join("\n");
+    parcalar.push(`${ticketListesi}\n\n**Toplam Kapatılan:** ${toplam} ticket`);
+  }
+
+  const regStats = getAllRegistrationStats();
+  parcalar.push("## 📋 Kayıt İstatistikleri");
+  if (regStats.length === 0) {
+    parcalar.push("Henüz kimse kayıt yapmamış.");
+  } else {
+    const toplamKayit = regStats.reduce((acc, s) => acc + s.count, 0);
+    const kayitListesi = regStats
+      .map((s, i) => {
+        const sira = madalyalar[i] ?? `**${i + 1}.**`;
+        return `${sira}  <@${s.userId}> — **${s.count}** kayıt`;
+      })
+      .join("\n");
+    parcalar.push(`${kayitListesi}\n\n**Toplam Kayıt:** ${toplamKayit} kayıt`);
+  }
+
+  embed.setDescription(parcalar.join("\n\n"));
+  embed.setFooter({ text: "Destek Sistemi" });
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+export async function handleTopResetCommand(interaction: ChatInputCommandInteraction): Promise<void> {
+  const member = interaction.member;
+  if (!member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu komut sadece sunucu içinde kullanılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
+    await interaction.reply({
+      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  resetClosedTicketStats();
+  resetRegistrationStats();
+  await interaction.reply("✅ Tüm ticket ve kayıt istatistikleri sıfırlandı.");
 }
