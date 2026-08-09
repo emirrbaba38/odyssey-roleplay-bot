@@ -79,7 +79,9 @@ export function buildTicketPanelMessage(guild: Guild, botAvatarURL: string | nul
         "▫️ Kanalı sadece **sen** ve **Ticket Yetkilisi** ekibimiz görebilir\n" +
         "▫️ İşin bitince ticket'ı kendin de kapatabilirsin"
     )
-    .setImage(botAvatarURL)
+    .setImage(
+      "https://cdn.discordapp.com/attachments/1348342995321356348/1535948198710087711/gorselde_ki_ates_yansn_boyle.gif?ex=6a799ebb&is=6a784d3b&hm=0bcb15184001f34b94d1192eb86a4f2c1db46ed3c2a9d0766773c796c3197610&"
+    )
     .setFooter({ text: "Destek Sistemi" })
     .setTimestamp();
 
