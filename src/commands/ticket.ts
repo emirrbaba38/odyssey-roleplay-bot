@@ -27,6 +27,7 @@ import {
   getAllClosedTicketStats,
   resetClosedTicketStats,
 } from "../lib/ticket-stats.js";
+import { getAllRegistrationStats } from "../lib/registration-stats.js";
 
 export const TICKET_SELECT_ID = "ticket_category_select";
 export const TICKET_CLOSE_PREFIX = "ticket_close_";
@@ -404,6 +405,19 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
         .join("\n")
     );
     embed.addFields({ name: "Toplam Kapatılan", value: `**${toplam}** ticket`, inline: true });
+  }
+
+  const regStats = getAllRegistrationStats();
+  if (regStats.length > 0) {
+    embed.addFields({
+      name: "📋 Kayıtlar",
+      value: regStats
+        .map((s, i) => {
+          const sira = madalyalar[i] ?? `**${i + 1}.**`;
+          return `${sira}  <@${s.userId}> — **${s.count}** kayıt`;
+        })
+        .join("\n"),
+    });
   }
 
   embed.setFooter({ text: "Destek Sistemi" });

@@ -19,6 +19,16 @@ const topResetCommand = new SlashCommandBuilder()
   .setName("topsıfırla")
   .setDescription("Ticket kapatma istatistiklerini sıfırlar (Sadece Yönetim Şefi)");
 
+const kayitCommand = new SlashCommandBuilder()
+  .setName("kayıt")
+  .setDescription("Bir kullanıcıyı whitelist'e kaydeder (Sadece Yetkili Ekibi)")
+  .addUserOption((option) =>
+    option.setName("kişi").setDescription("Kayıt edilecek kişi").setRequired(true)
+  )
+  .addStringOption((option) =>
+    option.setName("isim").setDescription("Kişinin ismi").setRequired(true)
+  );
+
 export async function registerCommands(client: Client): Promise<void> {
   const token = process.env.DISCORD_TOKEN!;
   const rest = new REST({ version: "10" }).setToken(token);
@@ -29,7 +39,13 @@ export async function registerCommands(client: Client): Promise<void> {
     return;
   }
 
-  const commands = [pingCommand.toJSON(), ticketPanelCommand.toJSON(), topAllCommand.toJSON(), topResetCommand.toJSON()];
+  const commands = [
+    pingCommand.toJSON(),
+    ticketPanelCommand.toJSON(),
+    topAllCommand.toJSON(),
+    topResetCommand.toJSON(),
+    kayitCommand.toJSON(),
+  ];
 
   const clientId = client.application?.id;
   if (!clientId) {

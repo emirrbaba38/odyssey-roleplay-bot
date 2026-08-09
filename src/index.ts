@@ -13,6 +13,7 @@ import {
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
 import { registerGreeting } from "./events/greeting.js";
+import { handleKayitCommand } from "./commands/kayit.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -48,6 +49,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleTopAllCommand(interaction);
       } else if (interaction.commandName === "topsıfırla") {
         await handleTopResetCommand(interaction);
+      } else if (interaction.commandName === "kayıt") {
+        await handleKayitCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {
