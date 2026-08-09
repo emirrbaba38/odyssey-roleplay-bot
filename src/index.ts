@@ -31,9 +31,21 @@ const client = new Client({
   ],
 });
 
+const BOT_BANNER_URL =
+  "https://cdn.discordapp.com/attachments/1348342995321356348/1535948198710087711/gorselde_ki_ates_yansn_boyle.gif?ex=6a799ebb&is=6a784d3b&hm=0bcb15184001f34b94d1192eb86a4f2c1db46ed3c2a9d0766773c796c3197610&";
+
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`✅ Giriş yapıldı: ${readyClient.user.tag}`);
   await registerCommands(client);
+
+  try {
+    if (!readyClient.user.banner) {
+      await readyClient.user.setBanner(BOT_BANNER_URL);
+      console.log("🖼️ Bot banner'ı ayarlandı.");
+    }
+  } catch (err) {
+    console.error("⚠️ Banner ayarlanamadı:", err);
+  }
 });
 
 client.on(Events.GuildCreate, async (guild) => {
