@@ -15,7 +15,6 @@ import {
   TICKET_CLAIM_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
-import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
 import { registerGreeting } from "./events/greeting.js";
 import { registerInviteTracker } from "./events/invite-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
@@ -67,7 +66,6 @@ client.on(Events.GuildCreate, async (guild) => {
 });
 
 registerAutoRole(client);
-registerVoiceWaitingRoom(client);
 registerGreeting(client);
 registerInviteTracker(client);
 
