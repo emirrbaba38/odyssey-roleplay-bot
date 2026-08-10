@@ -1,4 +1,4 @@
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
+import { GoogleGenAI } from "@google/genai";
 
 const SYSTEM_PROMPT = `Sen bir roleplay (rol yapma) Discord sunucusunda, oyuncuların gönderdiği rol/karakter
 metinlerini ön inceleyen bir asistansın. Görevin:
@@ -21,40 +21,18 @@ export async function analyzeRoleText(text: string): Promise<string> {
     );
   }
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: SYSTEM_PROMPT },
-            { text: text }
-          ]
-        }
-      ],
-      generationConfig: {
-        maxOutputTokens: 700,
-      }
-    }),
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-1.5-flash',
+    contents: [
+      { text: SYSTEM_PROMPT },
+      { text: text }
+    ],
+    config: {
+      maxOutputTokens: 700,
+    }
   });
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Gemini API hatası (${res.status}): ${errText.slice(0, 300)}`);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: {
-      content?: {
-        parts?: { text?: string }[];
-      };
-    }[];
-  };
-
-  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  return responseText?.trim() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
+  return response.text?.trim() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
 }
