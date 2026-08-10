@@ -1,5 +1,4 @@
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 const SYSTEM_PROMPT = `Sen bir roleplay (rol yapma) Discord sunucusunda, oyuncuların gönderdiği rol/karakter
 metinlerini ön inceleyen bir asistansın. Görevin:
@@ -15,37 +14,47 @@ metinlerini ön inceleyen bir asistansın. Görevin:
   değerlendirme olsun (yaklaşık 4-8 cümle).`;
 
 export async function analyzeRoleText(text: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "ANTHROPIC_API_KEY ortam değişkeni tanımlı değil (Railway > Variables kısmına eklenmeli)."
+      "GEMINI_API_KEY ortam değişkeni tanımlı değil (Railway > Variables kısmına eklenmeli)."
     );
   }
 
-  const res = await fetch(ANTHROPIC_API_URL, {
+  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 700,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: text }],
+      system_instruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: text }]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 700,
+      }
     }),
   });
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new Error(`Anthropic API hatası (${res.status}): ${errText.slice(0, 300)}`);
+    throw new Error(`Gemini API hatası (${res.status}): ${errText.slice(0, 300)}`);
   }
 
   const data = (await res.json()) as {
-    content?: { type: string; text?: string }[];
+    candidates?: {
+      content?: {
+        parts?: { text?: string }[];
+      };
+    }[];
   };
 
-  const textBlock = data.content?.find((c) => c.type === "text" && c.text);
-  return textBlock?.text?.trim() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
+  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  return responseText?.trim() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
 }
