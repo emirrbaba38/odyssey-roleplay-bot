@@ -10,7 +10,9 @@ Görevin:
 
 export async function analyzeRoleText(text: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY bulunamadı!");
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY ortam değişkeni tanımlı değil (Railway > Variables kısmına eklenmeli).");
+  }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ 
@@ -19,5 +21,5 @@ export async function analyzeRoleText(text: string): Promise<string> {
   });
 
   const result = await model.generateContent(text);
-  return result.response.text() || "Analiz yapılamadı.";
+  return result.response.text() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
 }
