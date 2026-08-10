@@ -1,5 +1,6 @@
 import { REST, Routes, SlashCommandBuilder } from "discord.js";
 import type { Client } from "discord.js";
+import { voiceTimeCommand } from "./events/voice-time-tracker.js";
 
 // Yeni komutlar buraya eklenecek (SlashCommandBuilder ile tanımlanıp, altta
 // "commands" dizisine ve index.ts'deki interaction yönlendirmesine eklenmeli).
@@ -35,6 +36,7 @@ const ALL_COMMANDS = [
   topAllCommand.toJSON(),
   topResetCommand.toJSON(),
   kayitCommand.toJSON(),
+  voiceTimeCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */
