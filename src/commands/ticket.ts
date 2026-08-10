@@ -55,7 +55,12 @@ const TICKET_CATEGORIES: TicketCategoryOption[] = [
   { value: "ck-talep", label: "CK Talep", description: "Karakter kapatma (CK) talebi", emoji: "⚰️" },
   { value: "evren-onay", label: "Evren Onay", description: "Evren/hikaye onayı için başvur", emoji: "🌍" },
   { value: "yetkili-sikayet", label: "Yetkili Şikayet", description: "Bir yetkili hakkında şikayetin", emoji: "⚠️" },
+  { value: "rol-onay", label: "Yeni Rol Onayı", description: "Yeni rolünü yapay zeka ön incelemesinden geçir", emoji: "🤖" },
 ];
+
+/** "Yeni Rol Onayı" kategorisiyle açılan ve kullanıcının ilk mesajını bekleyen kanal ID'leri.
+ *  İlk mesaj gelince yapay zeka analizi otomatik tetiklenir (bkz. events/rol-onay-review.ts). */
+export const pendingRoleReviewChannels = new Set<string>();
 
 // key: channelId -> claimedByUserId (bot yeniden başlayınca sıfırlanır)
 const ticketClaims = new Map<string, string>();
@@ -262,6 +267,14 @@ export async function handleTicketCategorySelect(
       components: [actionRow],
       allowedMentions: { users: [interaction.user.id], roles: ticketStaffRole ? [ticketStaffRole.id] : [] },
     });
+
+    if (category.value === "rol-onay") {
+      pendingRoleReviewChannels.add(ticketChannel.id);
+      await ticketChannel.send(
+        "📝 Yeni rolünü buraya **tek mesaj halinde** yazabilirsin. Mesajını gönderdiğin an " +
+          "yapay zeka ön incelemesi otomatik olarak başlayacak, ardından bir yetkili son kararı verecek."
+      );
+    }
 
     await interaction.editReply(`✅ Ticket'ın oluşturuldu: <#${ticketChannel.id}>`);
   } catch (err) {

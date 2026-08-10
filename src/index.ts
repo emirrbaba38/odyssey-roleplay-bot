@@ -23,6 +23,8 @@ import { registerAntiSpam } from "./events/anti-spam.js";
 import { registerProfanityFilter } from "./events/profanity-filter.js";
 import { registerVoiceTimeTracker, handleVoiceTimeCommand } from "./events/voice-time-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
+import { handleAnalizCommand } from "./commands/analiz.js";
+import { registerRolOnayReview } from "./events/rol-onay-review.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -78,6 +80,7 @@ registerIpPanel(client);
 registerAntiSpam(client);
 registerProfanityFilter(client);
 registerVoiceTimeTracker(client);
+registerRolOnayReview(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
@@ -94,6 +97,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleKayitCommand(interaction);
       } else if (interaction.commandName === "sesaktivite") {
         await handleVoiceTimeCommand(interaction);
+      } else if (interaction.commandName === "analiz") {
+        await handleAnalizCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {

@@ -30,6 +30,13 @@ const kayitCommand = new SlashCommandBuilder()
     option.setName("isim").setDescription("Kişinin ismi").setRequired(true)
   );
 
+const analizCommand = new SlashCommandBuilder()
+  .setName("analiz")
+  .setDescription("Bir rol metnini yapay zeka ile analiz eder (Sadece yetkili roller)")
+  .addStringOption((option) =>
+    option.setName("metin").setDescription("Analiz edilecek rol metni").setRequired(true)
+  );
+
 const ALL_COMMANDS = [
   pingCommand.toJSON(),
   ticketPanelCommand.toJSON(),
@@ -37,6 +44,7 @@ const ALL_COMMANDS = [
   topResetCommand.toJSON(),
   kayitCommand.toJSON(),
   voiceTimeCommand.toJSON(),
+  analizCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */
