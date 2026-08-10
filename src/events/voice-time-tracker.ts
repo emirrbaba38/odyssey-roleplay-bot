@@ -48,11 +48,16 @@ function saveStore(): void {
 }
 
 function formatDuration(ms: number): string {
-  const totalMinutes = Math.floor(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) return `${minutes} dakika`;
-  return `${hours} saat ${minutes} dakika`;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} saat`);
+  if (minutes > 0) parts.push(`${minutes} dakika`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds} saniye`);
+  return parts.join(" ");
 }
 
 export const voiceTimeCommand = new SlashCommandBuilder()
