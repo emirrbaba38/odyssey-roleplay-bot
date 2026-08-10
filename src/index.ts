@@ -19,6 +19,7 @@ import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
 import { registerGreeting } from "./events/greeting.js";
 import { registerInviteTracker } from "./events/invite-tracker.js";
 import { registerIpPanel } from "./events/ip-panel.js";
+import { registerAntiSpam } from "./events/anti-spam.js";
 import { handleKayitCommand } from "./commands/kayit.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,7 @@ registerVoiceWaitingRoom(client);
 registerGreeting(client);
 registerInviteTracker(client);
 registerIpPanel(client);
+registerAntiSpam(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
