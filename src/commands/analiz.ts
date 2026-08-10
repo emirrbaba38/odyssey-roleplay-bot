@@ -19,10 +19,19 @@ export async function handleAnalizCommand(interaction: ChatInputCommandInteracti
 
   try {
     const analysis = await analyzeRoleText(metin);
+
+    const lower = analysis.toLowerCase();
+    let color = Colors.Blurple;
+    if (lower.includes("reddediyorum") || lower.includes("reddet")) {
+      color = Colors.Red;
+    } else if (lower.includes("onaylıyorum") || lower.includes("onaylayalım") || lower.includes("onaylanabilir")) {
+      color = Colors.Green;
+    }
+
     const embed = new EmbedBuilder()
-      .setColor(Colors.Blurple)
+      .setColor(color)
       .setTitle("🤖 Rol Analizi")
-      .setDescription(analysis)
+      .setDescription(`> ${metin.length > 200 ? metin.slice(0, 200) + "…" : metin}\n\n${analysis}`)
       .setFooter({ text: "Bu bir yapay zeka önerisidir, son karar yetkiliye aittir." })
       .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
