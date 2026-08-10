@@ -1,4 +1,4 @@
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 const SYSTEM_PROMPT = `Sen bir roleplay (rol yapma) Discord sunucusunda, oyuncuların gönderdiği rol/karakter
 metinlerini ön inceleyen bir asistansın. Görevin:
@@ -27,13 +27,13 @@ export async function analyzeRoleText(text: string): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
       contents: [
         {
           role: "user",
-          parts: [{ text: text }]
+          parts: [
+            { text: SYSTEM_PROMPT },
+            { text: text }
+          ]
         }
       ],
       generationConfig: {
