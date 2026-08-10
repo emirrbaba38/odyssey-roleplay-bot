@@ -1,25 +1,26 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
 
-const SYSTEM_PROMPT = `Sen bir roleplay (rol yapma) Discord sunucusunda, oyuncuların gönderdiği rol/karakter metinlerini ön inceleyen bir asistansın.
-Görevin:
-- Metni dikkatlice incele, mantık hataları, tutarsızlıklar, aşırı güçlü (overpowered) özellikler veya sunucu kurallarına aykırı noktalar varsa bunları belirt.
-- Rol mantıklı ve dengeliyse bunu samimi bir dille onayla.
-- Kanaatini net belirt: "bana kalırsa onaylayalım" ya da "bana kalırsa reddediyorum" gibi.
-- Son kararın yetkiliye ait olduğunu hatırlat.
-- Kısa, sıcak, saygılı ve Türkçe yaz. 4-8 cümlelik bir değerlendirme olsun.`;
+const SYSTEM_PROMPT = `Sen bir roleplay Discord sunucusunda rol metinlerini inceleyen bir asistansın.
+Görevin: Metni incele, mantık hatalarını veya kural dışı durumları belirt. 
+Kanaatini net belirt ("onaylayalım" ya da "reddediyorum" gibi). Son kararın yetkiliye ait olduğunu hatırlat. Türkçe, kısa ve samimi yaz.`;
 
 export async function analyzeRoleText(text: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY ortam değişkeni tanımlı değil (Railway > Variables kısmına eklenmeli).");
-  }
+  if (!apiKey) throw new Error("GEMINI_API_KEY bulunamadı!");
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    systemInstruction: SYSTEM_PROMPT 
+  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Metin: ${text}` }] }]
+    })
   });
 
-  const result = await model.generateContent(text);
-  return result.response.text() || "⚠️ Analiz alınamadı, boş yanıt döndü.";
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`API Hatası (${res.status}): ${err.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Analiz alınamadı.";
 }
