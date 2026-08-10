@@ -1,4 +1,4 @@
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
 
 const SYSTEM_PROMPT = `Sen bir roleplay Discord sunucusunda rol metinlerini inceleyen bir asistansın.
 Görevin: Metni incele, mantık hatalarını veya kural dışı durumları belirt. 
