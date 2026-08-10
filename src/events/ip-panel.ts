@@ -1,4 +1,4 @@
-import { Client, Message, EmbedBuilder, Colors } from "discord.js";
+import { Client, Message, EmbedBuilder } from "discord.js";
 
 // IPv4 adresi (isteğe bağlı :port ile) — örn: 192.168.1.1 veya 192.168.1.1:25565
 const IP_REGEX =
@@ -13,10 +13,18 @@ export function registerIpPanel(client: Client): void {
     if (!message.channel.isSendable()) return;
 
     try {
+      const guildName = message.guild.name;
+      const guildIcon = message.guild.iconURL({ size: 256 }) ?? undefined;
+      const botAvatar = client.user?.displayAvatarURL({ size: 256 }) ?? undefined;
+
       const embed = new EmbedBuilder()
-        .setColor(Colors.DarkAqua)
-        .setDescription("**Şu anlık sunucumuz kapalıdır.**")
-        .setThumbnail(client.user?.displayAvatarURL({ size: 256 }) ?? null);
+        .setColor(0x2b2d31)
+        .setAuthor({ name: guildName, iconURL: guildIcon })
+        .setDescription(
+          `**${guildName} Sunucu IP Bilgi:**\n\`\`\`Şu anlık sunucumuz kapalıdır.\`\`\``
+        )
+        .setThumbnail(botAvatar ?? null)
+        .setTimestamp();
 
       await message.channel.send({ embeds: [embed] });
     } catch (err) {
