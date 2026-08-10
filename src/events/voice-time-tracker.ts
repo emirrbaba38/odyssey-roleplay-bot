@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, "..", "..", "data");
 const DATA_FILE = join(DATA_DIR, "voice-time.json");
-const LOG_CHANNEL_NAME = "chat-log";
+const LOG_CHANNEL_NAME = "sesli-bağlantı";
 
 type UserVoiceData = {
   totalMs: number;
