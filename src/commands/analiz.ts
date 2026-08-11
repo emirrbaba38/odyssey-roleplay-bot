@@ -21,7 +21,7 @@ export async function handleAnalizCommand(interaction: ChatInputCommandInteracti
     const analysis = await analyzeRoleText(metin);
 
     const lower = analysis.toLowerCase();
-    let color = Colors.Blurple;
+    let color: number = Colors.Blurple;
     if (lower.includes("reddediyorum") || lower.includes("reddet")) {
       color = Colors.Red;
     } else if (lower.includes("onaylıyorum") || lower.includes("onaylayalım") || lower.includes("onaylanabilir")) {

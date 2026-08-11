@@ -8,11 +8,15 @@ import {
   handleTicketCategorySelect,
   handleTicketCloseButton,
   handleTicketClaimButton,
+  handleTicketAddMemberButton,
+  handleTicketAddMemberSelect,
   handleTopAllCommand,
   handleTopResetCommand,
   TICKET_SELECT_ID,
   TICKET_CLOSE_PREFIX,
   TICKET_CLAIM_PREFIX,
+  TICKET_ADD_MEMBER_BUTTON_PREFIX,
+  TICKET_ADD_MEMBER_SELECT_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
 import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
@@ -105,9 +109,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId === TICKET_SELECT_ID) {
         await handleTicketCategorySelect(interaction);
       }
+    } else if (interaction.isUserSelectMenu()) {
+      if (interaction.customId.startsWith(TICKET_ADD_MEMBER_SELECT_PREFIX)) {
+        await handleTicketAddMemberSelect(interaction);
+      }
     } else if (interaction.isButton()) {
       if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaimButton(interaction);
+      } else if (interaction.customId.startsWith(TICKET_ADD_MEMBER_BUTTON_PREFIX)) {
+        await handleTicketAddMemberButton(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseButton(interaction);
       }

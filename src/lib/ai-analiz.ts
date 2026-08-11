@@ -39,6 +39,8 @@ export async function analyzeRoleText(text: string): Promise<string> {
     throw new Error(`API Hatası (${res.status}): ${err.slice(0, 200)}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Analiz alınamadı.";
 }

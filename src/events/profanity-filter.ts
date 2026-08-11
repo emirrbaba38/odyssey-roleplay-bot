@@ -2,8 +2,9 @@ import { Client, Message, EmbedBuilder, Colors } from "discord.js";
 
 const LOG_CHANNEL_NAME = "chat-log";
 
-// Yasaklı kelime/kalıplar (küçük harfe çevrilip, boşluk/nokta/yıldız gibi
-// ayraçlar temizlenerek kontrol edilir, bu yüzden "a.m.ı.n.a" gibi yazımları da yakalar).
+// Yasaklı kelime/kalıplar (tam kelime eşleşmesiyle kontrol edilir — yani "hoca"
+// içindeki "oc" gibi parçalar artık tetiklemez, ama "a.m.k" gibi noktalarla
+// bölünmüş yazımlar tek kelime içinde normalize edilip yine yakalanır).
 const BANNED_PATTERNS: string[] = [
   // Küfürler
   "aminakoyim", "aminakoyayim", "amınakoyim", "amcikoyim",
@@ -11,8 +12,8 @@ const BANNED_PATTERNS: string[] = [
   "orospucocugu", "orospucocuğu", "orospu", "piç", "pic",
   "ananisikim", "ananısikim", "ananısiktiğim", "ananisiktigim",
   "babanisikim", "babanısikim",
-  "amk", "aq", "oç", "oc ", "mk ",
-  "göt", "got herif", "gotveren", "götveren", "ibne", "top",
+  "amk", "aq", "oç",
+  "göt", "gotherif", "gotveren", "götveren", "ibne", "top",
 
   // Ata / büyüklere hakaret
   "ataturksikim", "atatürksikim", "atatürkesiktir", "ataturkesiktir",
@@ -23,17 +24,31 @@ const BANNED_PATTERNS: string[] = [
   "peygambersikim", "kitabasiktir", "kuranasiktir", "kur'anasiktir",
 ];
 
-function normalize(text: string): string {
-  return text
+// Tek kelime içinde normalize eder (harf/rakam dışını temizler). Kelimeler
+// arasındaki boşluğu KORUR ki "hocam" gibi kelimeler parçalara ayrılıp yanlış
+// eşleşmesin — sadece "a.m.k" gibi TEK kelime içi ayraçlar temizlenir.
+function normalizeWord(word: string): string {
+  return word
     .toLocaleLowerCase("tr-TR")
     .replace(/[^a-zçğıöşü0-9]/g, "");
 }
 
 function containsProfanity(rawContent: string): string | null {
-  const normalized = normalize(rawContent);
+  const words = rawContent
+    .split(/\s+/)
+    .map(normalizeWord)
+    .filter(Boolean);
+
+  // İki kelimelik kalıpları (örn. "got herif") komşu kelimeleri birleştirerek yakala
+  const joinedPairs = new Set<string>();
+  for (let i = 0; i < words.length - 1; i++) {
+    joinedPairs.add(words[i] + words[i + 1]);
+  }
+
   for (const pattern of BANNED_PATTERNS) {
-    const cleanPattern = normalize(pattern);
-    if (cleanPattern && normalized.includes(cleanPattern)) {
+    const cleanPattern = normalizeWord(pattern);
+    if (!cleanPattern) continue;
+    if (words.includes(cleanPattern) || joinedPairs.has(cleanPattern)) {
       return pattern;
     }
   }
