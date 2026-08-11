@@ -41,7 +41,10 @@ const hikayeAnalizCommand = new SlashCommandBuilder()
   .setName("hikayeanaliz")
   .setDescription("Bir karakter hikayesini yapay zeka ile analiz eder (Sadece yetkili roller)")
   .addStringOption((option) =>
-    option.setName("hikaye").setDescription("Analiz edilecek karakter hikayesi").setRequired(true)
+    option.setName("hikaye").setDescription("Analiz edilecek karakter hikayesi (kısa hikayeler için)").setRequired(false)
+  )
+  .addAttachmentOption((option) =>
+    option.setName("dosya").setDescription("Uzun hikayeler için .txt dosyası yükle").setRequired(false)
   );
 
 const ALL_COMMANDS = [

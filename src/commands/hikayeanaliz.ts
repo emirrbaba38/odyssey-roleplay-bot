@@ -14,10 +14,43 @@ export async function handleHikayeAnalizCommand(interaction: ChatInputCommandInt
     return;
   }
 
-  const hikaye = interaction.options.getString("hikaye", true);
+  const hikayeMetin = interaction.options.getString("hikaye");
+  const dosya = interaction.options.getAttachment("dosya");
+
+  if (!hikayeMetin && !dosya) {
+    await interaction.reply({
+      content: "❌ Ya `hikaye` metnini yaz ya da `dosya` olarak bir .txt dosyası yükle.",
+      ephemeral: true,
+    });
+    return;
+  }
+
   await interaction.deferReply();
 
   try {
+    let hikaye = hikayeMetin ?? "";
+
+    // Uzun hikayeler için .txt dosyası desteği — Discord'un mesaj/komut karakter
+    // limitine takılmadan tüm metni okuyabiliriz.
+    if (dosya) {
+      if (!dosya.name.toLowerCase().endsWith(".txt") && !dosya.contentType?.startsWith("text/")) {
+        await interaction.editReply("❌ Sadece `.txt` dosyaları desteklenir.");
+        return;
+      }
+      const res = await fetch(dosya.url);
+      if (!res.ok) {
+        await interaction.editReply("❌ Dosya indirilemedi, tekrar dener misin?");
+        return;
+      }
+      const dosyaIcerik = await res.text();
+      hikaye = [hikaye, dosyaIcerik].filter(Boolean).join("\n\n").trim();
+    }
+
+    if (!hikaye) {
+      await interaction.editReply("❌ Dosya boş görünüyor.");
+      return;
+    }
+
     const analysis = await analyzeCharacterBackstory(hikaye);
 
     const lower = analysis.toLowerCase();
@@ -28,10 +61,13 @@ export async function handleHikayeAnalizCommand(interaction: ChatInputCommandInt
       color = Colors.Green;
     }
 
+    const onizleme = hikaye.length > 200 ? hikaye.slice(0, 200) + "…" : hikaye;
+    const description = `> ${onizleme}\n\n${analysis}`.slice(0, 4000);
+
     const embed = new EmbedBuilder()
       .setColor(color)
       .setTitle("📖 Karakter Hikayesi Analizi")
-      .setDescription(`> ${hikaye.length > 200 ? hikaye.slice(0, 200) + "…" : hikaye}\n\n${analysis}`)
+      .setDescription(description)
       .setFooter({ text: "Bu bir yapay zeka önerisidir, son karar yetkiliye aittir." })
       .setTimestamp();
     await interaction.editReply({ embeds: [embed] });
