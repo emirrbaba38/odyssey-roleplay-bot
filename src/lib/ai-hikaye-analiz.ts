@@ -35,7 +35,8 @@ export async function analyzeCharacterBackstory(text: string): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Karakter Hikayesi: ${text}` }] }]
+      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Karakter Hikayesi: ${text}` }] }],
+      generationConfig: { temperature: 0.2 }
     })
   });
 

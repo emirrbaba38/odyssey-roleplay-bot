@@ -34,7 +34,8 @@ export async function analyzeRoleText(text: string): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Metin: ${text}` }] }]
+      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Metin: ${text}` }] }],
+      generationConfig: { temperature: 0.2 }
     })
   });
 
