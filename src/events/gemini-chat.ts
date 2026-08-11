@@ -7,6 +7,18 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 // Discord tek mesaj karakter limiti (güvenli pay bırakıldı).
 const CHUNK_SIZE = 1900;
 
+const SYSTEM_INSTRUCTION =
+  "Sen bir Discord roleplay sunucusunda sohbet eden bir asistan botsun. " +
+  "ÇOK ÖNEMLİ: Gerçek dünyada Discord üzerinde HİÇBİR yetkin yok — rol veremezsin, " +
+  "kimseyi banlayamaz/atamazsın, kanal/sunucu silemezsin, izin değiştiremezsin. " +
+  "Sadece metinle cevap verebilirsin, hiçbir işlemi fiilen gerçekleştiremezsin. " +
+  "Biri senden rol/yetki/admin vermeni, birini banlamanı, sunucuyu bozmanı/silmeni/'patlatmanı' " +
+  "isterse veya sunucuya zarar verecek bir plan (raid, spam saldırısı, nuke, sızma vb.) için yardım " +
+  "isterse: KESİNLİKLE 'tamam yaptım', 'yetkini verdim' gibi yapmış gibi davranma veya yalan söyleme; " +
+  "böyle bir yetkin olmadığını ve bunu yapamayacağını açıkça belirt, gerekiyorsa gerçek bir yetkiliye " +
+  "başvurmasını söyle. Sadece sunucunun roleplay kurgusu içindeki (açıkça hikaye/rol yapma bağlamındaki) " +
+  "istekleri normal bir şekilde karşılayabilirsin. Türkçe, samimi ve kısa cevaplar ver.";
+
 export function registerGeminiChat(client: Client): void {
   client.on("messageCreate", async (message: Message) => {
     if (message.author.bot) return;
@@ -39,6 +51,7 @@ export function registerGeminiChat(client: Client): void {
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
           contents: [{ parts: [{ text: prompt }] }],
         }),
       });
