@@ -20,6 +20,7 @@ import { registerGreeting } from "./events/greeting.js";
 import { registerInviteTracker } from "./events/invite-tracker.js";
 import { registerIpPanel } from "./events/ip-panel.js";
 import { registerAntiSpam } from "./events/anti-spam.js";
+import { registerGeminiChat } from "./events/gemini-chat.js";
 import { handleKayitCommand } from "./commands/kayit.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +75,7 @@ registerGreeting(client);
 registerInviteTracker(client);
 registerIpPanel(client);
 registerAntiSpam(client);
+registerGeminiChat(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
