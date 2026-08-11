@@ -28,6 +28,7 @@ import { registerProfanityFilter } from "./events/profanity-filter.js";
 import { registerVoiceTimeTracker, handleVoiceTimeCommand } from "./events/voice-time-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
 import { handleAnalizCommand } from "./commands/analiz.js";
+import { handleHikayeAnalizCommand } from "./commands/hikayeanaliz.js";
 import { registerRolOnayReview } from "./events/rol-onay-review.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -103,6 +104,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleVoiceTimeCommand(interaction);
       } else if (interaction.commandName === "analiz") {
         await handleAnalizCommand(interaction);
+      } else if (interaction.commandName === "hikayeanaliz") {
+        await handleHikayeAnalizCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {
