@@ -11,6 +11,13 @@ export const YONETIM_SEFI_ROLE_ID = "1535212991585194025";
 export const YETKILI_EKIBI_ROLE_ID = "1535213004252258394";
 export const TICKET_STAFF_ROLE_ID = "1535955544190488586";
 
+// /analiz komutunu kullanabilecek roller (birden fazla rol ID'si).
+export const ANALIZ_ROLE_IDS = [
+  "1535212992591822919",
+  "1535212989370867743",
+  "1535212990713040939",
+];
+
 // Hata mesajlarında gösterilecek okunabilir isimler (yetki kontrolü için kullanılmıyor)
 export const KURUCU_ROLE_NAME = "🔱・Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";
@@ -35,6 +42,10 @@ export function memberHasRoleNamed(member: GuildMember, name: string): boolean {
 
 export function memberHasRoleId(member: GuildMember, roleId: string): boolean {
   return member.roles.cache.has(roleId);
+}
+
+export function memberHasAnyRoleId(member: GuildMember, roleIds: string[]): boolean {
+  return roleIds.some((id) => member.roles.cache.has(id));
 }
 
 export async function findTextChannelByName(

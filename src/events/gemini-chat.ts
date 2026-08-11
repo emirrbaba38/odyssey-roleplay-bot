@@ -18,9 +18,9 @@ export function registerGeminiChat(client: Client): void {
     const prompt = content.slice(TRIGGER_PREFIX.length).trim();
     if (!prompt) return;
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY_SOHBET;
     if (!apiKey) {
-      console.error("[gemini-chat] GEMINI_API_KEY ortam değişkeni tanımlı değil.");
+      console.error("[gemini-chat] GEMINI_API_KEY_SOHBET ortam değişkeni tanımlı değil.");
       await message
         .reply("❌ Şu an yapılandırılmadım, bir yetkiliye haber ver.")
         .catch(() => {});

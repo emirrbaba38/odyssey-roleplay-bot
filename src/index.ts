@@ -8,11 +8,15 @@ import {
   handleTicketCategorySelect,
   handleTicketCloseButton,
   handleTicketClaimButton,
+  handleTicketAddMemberButton,
+  handleTicketAddMemberSelect,
   handleTopAllCommand,
   handleTopResetCommand,
   TICKET_SELECT_ID,
   TICKET_CLOSE_PREFIX,
   TICKET_CLAIM_PREFIX,
+  TICKET_ADD_MEMBER_BUTTON_PREFIX,
+  TICKET_ADD_MEMBER_SELECT_PREFIX,
 } from "./commands/ticket.js";
 import { registerAutoRole } from "./events/auto-role.js";
 import { registerVoiceWaitingRoom } from "./events/voice-waiting-room.js";
@@ -21,7 +25,12 @@ import { registerInviteTracker } from "./events/invite-tracker.js";
 import { registerIpPanel } from "./events/ip-panel.js";
 import { registerAntiSpam } from "./events/anti-spam.js";
 import { registerGeminiChat } from "./events/gemini-chat.js";
+import { registerProfanityFilter } from "./events/profanity-filter.js";
+import { registerVoiceTimeTracker, handleVoiceTimeCommand } from "./events/voice-time-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
+import { handleAnalizCommand } from "./commands/analiz.js";
+import { handleHikayeAnalizCommand } from "./commands/hikayeanaliz.js";
+import { registerRolOnayReview } from "./events/rol-onay-review.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +85,9 @@ registerInviteTracker(client);
 registerIpPanel(client);
 registerAntiSpam(client);
 registerGeminiChat(client);
+registerProfanityFilter(client);
+registerVoiceTimeTracker(client);
+registerRolOnayReview(client);
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
@@ -90,15 +102,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleTopResetCommand(interaction);
       } else if (interaction.commandName === "kayıt") {
         await handleKayitCommand(interaction);
+      } else if (interaction.commandName === "sesaktivite") {
+        await handleVoiceTimeCommand(interaction);
+      } else if (interaction.commandName === "analiz") {
+        await handleAnalizCommand(interaction);
+      } else if (interaction.commandName === "hikayeanaliz") {
+        await handleHikayeAnalizCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {
       if (interaction.customId === TICKET_SELECT_ID) {
         await handleTicketCategorySelect(interaction);
       }
+    } else if (interaction.isUserSelectMenu()) {
+      if (interaction.customId.startsWith(TICKET_ADD_MEMBER_SELECT_PREFIX)) {
+        await handleTicketAddMemberSelect(interaction);
+      }
     } else if (interaction.isButton()) {
       if (interaction.customId.startsWith(TICKET_CLAIM_PREFIX)) {
         await handleTicketClaimButton(interaction);
+      } else if (interaction.customId.startsWith(TICKET_ADD_MEMBER_BUTTON_PREFIX)) {
+        await handleTicketAddMemberButton(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseButton(interaction);
       }

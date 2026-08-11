@@ -1,5 +1,6 @@
 import { REST, Routes, SlashCommandBuilder } from "discord.js";
 import type { Client } from "discord.js";
+import { voiceTimeCommand } from "./events/voice-time-tracker.js";
 
 // Yeni komutlar buraya eklenecek (SlashCommandBuilder ile tanımlanıp, altta
 // "commands" dizisine ve index.ts'deki interaction yönlendirmesine eklenmeli).
@@ -29,12 +30,32 @@ const kayitCommand = new SlashCommandBuilder()
     option.setName("isim").setDescription("Kişinin ismi").setRequired(true)
   );
 
+const analizCommand = new SlashCommandBuilder()
+  .setName("analiz")
+  .setDescription("Bir rol metnini yapay zeka ile analiz eder (Sadece yetkili roller)")
+  .addStringOption((option) =>
+    option.setName("metin").setDescription("Analiz edilecek rol metni").setRequired(true)
+  );
+
+const hikayeAnalizCommand = new SlashCommandBuilder()
+  .setName("hikayeanaliz")
+  .setDescription("Bir karakter hikayesini yapay zeka ile analiz eder (Sadece yetkili roller)")
+  .addStringOption((option) =>
+    option.setName("hikaye").setDescription("Analiz edilecek karakter hikayesi (kısa hikayeler için)").setRequired(false)
+  )
+  .addAttachmentOption((option) =>
+    option.setName("dosya").setDescription("Uzun hikayeler için .txt dosyası yükle").setRequired(false)
+  );
+
 const ALL_COMMANDS = [
   pingCommand.toJSON(),
   ticketPanelCommand.toJSON(),
   topAllCommand.toJSON(),
   topResetCommand.toJSON(),
   kayitCommand.toJSON(),
+  voiceTimeCommand.toJSON(),
+  analizCommand.toJSON(),
+  hikayeAnalizCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */

@@ -1,11 +1,13 @@
 import {
   ChatInputCommandInteraction,
   StringSelectMenuInteraction,
+  UserSelectMenuInteraction,
   ButtonInteraction,
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  UserSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
@@ -36,6 +38,8 @@ import { getAllRegistrationStats, resetRegistrationStats } from "../lib/registra
 export const TICKET_SELECT_ID = "ticket_category_select";
 export const TICKET_CLOSE_PREFIX = "ticket_close_";
 export const TICKET_CLAIM_PREFIX = "ticket_claim_";
+export const TICKET_ADD_MEMBER_BUTTON_PREFIX = "ticket_add_member_btn_";
+export const TICKET_ADD_MEMBER_SELECT_PREFIX = "ticket_add_member_select_";
 const TICKET_CATEGORY_NAME = "Ticketler";
 
 interface TicketCategoryOption {
@@ -55,7 +59,12 @@ const TICKET_CATEGORIES: TicketCategoryOption[] = [
   { value: "ck-talep", label: "CK Talep", description: "Karakter kapatma (CK) talebi", emoji: "⚰️" },
   { value: "evren-onay", label: "Evren Onay", description: "Evren/hikaye onayı için başvur", emoji: "🌍" },
   { value: "yetkili-sikayet", label: "Yetkili Şikayet", description: "Bir yetkili hakkında şikayetin", emoji: "⚠️" },
+  { value: "rol-onay", label: "Yeni Rol Onayı", description: "Yeni rolünü yapay zeka ön incelemesinden geçir", emoji: "🤖" },
 ];
+
+/** "Yeni Rol Onayı" kategorisiyle açılan ve kullanıcının ilk mesajını bekleyen kanal ID'leri.
+ *  İlk mesaj gelince yapay zeka analizi otomatik tetiklenir (bkz. events/rol-onay-review.ts). */
+export const pendingRoleReviewChannels = new Set<string>();
 
 // key: channelId -> claimedByUserId (bot yeniden başlayınca sıfırlanır)
 const ticketClaims = new Map<string, string>();
@@ -247,6 +256,10 @@ export async function handleTicketCategorySelect(
         .setLabel("🙋 Sahiplen")
         .setStyle(ButtonStyle.Primary),
       new ButtonBuilder()
+        .setCustomId(`${TICKET_ADD_MEMBER_BUTTON_PREFIX}${ticketChannel.id}`)
+        .setLabel("➕ Üye Ekle")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
         .setCustomId(`${TICKET_CLOSE_PREFIX}${interaction.user.id}`)
         .setLabel("🔒 Ticketi Kapat")
         .setStyle(ButtonStyle.Danger)
@@ -263,6 +276,14 @@ export async function handleTicketCategorySelect(
       allowedMentions: { users: [interaction.user.id], roles: ticketStaffRole ? [ticketStaffRole.id] : [] },
     });
 
+    if (category.value === "rol-onay") {
+      pendingRoleReviewChannels.add(ticketChannel.id);
+      await ticketChannel.send(
+        "📝 Yeni rolünü buraya **tek mesaj halinde** yazabilirsin. Mesajını gönderdiğin an " +
+          "yapay zeka ön incelemesi otomatik olarak başlayacak, ardından bir yetkili son kararı verecek."
+      );
+    }
+
     await interaction.editReply(`✅ Ticket'ın oluşturuldu: <#${ticketChannel.id}>`);
   } catch (err) {
     console.error("[ticket] kategori seçimi işlenirken hata:", err);
@@ -270,6 +291,79 @@ export async function handleTicketCategorySelect(
       .editReply(`❌ Ticket oluşturulurken bir hata oluştu: ${(err as Error).message}`)
       .catch(() => {});
   }
+}
+
+export async function handleTicketAddMemberButton(interaction: ButtonInteraction): Promise<void> {
+  const guild = interaction.guild;
+  const member = interaction.member;
+  if (!guild || !member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu işlem sadece sunucuda yapılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
+    await interaction.reply({
+      content: `❌ Bu ticket'a sadece **${TICKET_STAFF_ROLE_NAME}** üye ekleyebilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const channelId = interaction.customId.replace(TICKET_ADD_MEMBER_BUTTON_PREFIX, "");
+
+  const selectRow = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId(`${TICKET_ADD_MEMBER_SELECT_PREFIX}${channelId}`)
+      .setPlaceholder("Eklemek istediğin üyeyi seç...")
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  await interaction.reply({
+    content: "👤 Ticket'a eklemek istediğin üyeyi aşağıdan seç:",
+    components: [selectRow],
+    ephemeral: true,
+  });
+}
+
+export async function handleTicketAddMemberSelect(interaction: UserSelectMenuInteraction): Promise<void> {
+  const guild = interaction.guild;
+  const member = interaction.member;
+  if (!guild || !member || !("roles" in member)) {
+    await interaction.reply({ content: "❌ Bu işlem sadece sunucuda yapılabilir.", ephemeral: true });
+    return;
+  }
+
+  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
+    await interaction.reply({
+      content: `❌ Bu ticket'a sadece **${TICKET_STAFF_ROLE_NAME}** üye ekleyebilir.`,
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const channelId = interaction.customId.replace(TICKET_ADD_MEMBER_SELECT_PREFIX, "");
+  const channel = guild.channels.cache.get(channelId) as TextChannel | undefined;
+  if (!channel) {
+    await interaction.reply({ content: "❌ Ticket kanalı bulunamadı.", ephemeral: true });
+    return;
+  }
+
+  const selectedUserId = interaction.values[0];
+
+  await channel.permissionOverwrites.edit(selectedUserId, {
+    ViewChannel: true,
+    SendMessages: true,
+    ReadMessageHistory: true,
+  });
+
+  await interaction.update({ content: `✅ <@${selectedUserId}> ticket'a eklendi.`, components: [] });
+  await channel
+    .send({
+      content: `➕ <@${selectedUserId}>, <@${interaction.user.id}> tarafından bu ticket'a eklendi.`,
+      allowedMentions: { users: [selectedUserId] },
+    })
+    .catch(() => {});
 }
 
 export async function handleTicketClaimButton(interaction: ButtonInteraction): Promise<void> {
