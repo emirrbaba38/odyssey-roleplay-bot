@@ -1,9 +1,11 @@
-import { Client, Message, EmbedBuilder, TextChannel, Colors } from "discord.js";
+import { Client, Message, EmbedBuilder, TextChannel, Colors, GuildMember } from "discord.js";
 
-// Aynı mesajı üst üste kaç kez yazınca uyarı verilecek.
+// Aynı mesajı üst üste kaç kez yazınca uyarı verilip mesajlar silinecek.
 const WARN_THRESHOLD = 3;
-// Aynı mesajı üst üste kaç kez yazınca mesajlar silinecek.
-const DELETE_THRESHOLD = 5;
+// Aynı mesajı üst üste kaç kez yazınca kullanıcıya 1 günlük zaman aşımı (timeout) verilecek.
+const TIMEOUT_THRESHOLD = 5;
+// Zaman aşımı süresi: 1 gün.
+const TIMEOUT_DURATION_MS = 24 * 60 * 60 * 1000;
 // Bu süre (ms) içinde tekrar yazılmazsa spam sayacı sıfırlanır.
 const RESET_WINDOW_MS = 30_000;
 // Logların gönderileceği kanal adı.
@@ -53,34 +55,41 @@ export function registerAntiSpam(client: Client): void {
     }
     spamMap.set(key, state);
 
-    // 3. tekrarda uyarı ver (sadece bir kez).
+    // 3. tekrarda: kullanıcıyı uyar VE o ana kadarki spam mesajlarını sil.
     if (state.count === WARN_THRESHOLD && !state.warned) {
       state.warned = true;
-      if (message.channel.isSendable()) {
-        await message.channel
+      const channel = message.channel;
+
+      if (channel.isSendable()) {
+        await channel
           .send(`⚠️ ${message.author}, hop dur kardeşim! Aynı şeyleri yazma.`)
           .catch(() => {});
       }
+
+      await deleteMessages(channel, state.messageIds);
+      await sendSpamLog(client, message, state, "warn");
+
+      // Silinen mesajları listeden çıkar ama sayaç 5'e doğru artmaya devam etsin.
+      state.messageIds = [];
     }
 
-    // 5. tekrarda mesajları sil ve logla.
-    if (state.count === DELETE_THRESHOLD) {
+    // 5. tekrarda: yeni spam mesajlarını sil + 1 günlük timeout uygula + logla.
+    if (state.count === TIMEOUT_THRESHOLD) {
       const channel = message.channel;
-      const idsToDelete = [...state.messageIds];
+      await deleteMessages(channel, state.messageIds);
 
-      if (channel.isTextBased() && "bulkDelete" in channel) {
+      const member = message.member;
+      let timeoutApplied = false;
+      if (member) {
         try {
-          await (channel as TextChannel).bulkDelete(idsToDelete, true);
-        } catch {
-          // bulkDelete başarısız olursa (örn. 14 günden eski) tek tek dene.
-          for (const id of idsToDelete) {
-            const msg = await channel.messages.fetch(id).catch(() => null);
-            await msg?.delete().catch(() => {});
-          }
+          await member.timeout(TIMEOUT_DURATION_MS, "Spam - tekrarlayan mesajlar (otomatik)");
+          timeoutApplied = true;
+        } catch (err) {
+          console.error("[anti-spam] Timeout uygulanamadı:", err);
         }
       }
 
-      await sendSpamLog(client, message, state);
+      await sendSpamLog(client, message, state, "timeout", timeoutApplied);
 
       // Sayaç sıfırlansın, yeniden tetiklenmesin.
       spamMap.delete(key);
@@ -88,10 +97,27 @@ export function registerAntiSpam(client: Client): void {
   });
 }
 
+async function deleteMessages(channel: Message["channel"], ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  if (!channel.isTextBased() || !("bulkDelete" in channel)) return;
+
+  try {
+    await (channel as TextChannel).bulkDelete(ids, true);
+  } catch {
+    // bulkDelete başarısız olursa (örn. 14 günden eski) tek tek dene.
+    for (const id of ids) {
+      const msg = await channel.messages.fetch(id).catch(() => null);
+      await msg?.delete().catch(() => {});
+    }
+  }
+}
+
 async function sendSpamLog(
   client: Client,
   message: Message,
-  state: SpamState
+  state: SpamState,
+  type: "warn" | "timeout",
+  timeoutApplied?: boolean
 ): Promise<void> {
   const guild = message.guild;
   if (!guild) return;
@@ -112,18 +138,28 @@ async function sendSpamLog(
   const botAvatar = client.user?.displayAvatarURL({ size: 256 }) ?? undefined;
 
   const embed = new EmbedBuilder()
-    .setColor(Colors.Red)
     .setAuthor({ name: guild.name, iconURL: guild.iconURL({ size: 256 }) ?? undefined })
-    .setTitle("🚫 Spam Tespit Edildi — Mesajlar Silindi")
     .setThumbnail(botAvatar ?? null)
     .addFields(
       { name: "Kullanıcı", value: `${message.author} (\`${message.author.tag}\`)`, inline: true },
       { name: "Kanal", value: `${message.channel}`, inline: true },
       { name: "Tekrar Sayısı", value: `${state.count} kez`, inline: true },
-      { name: "Silinen Mesaj İçeriği", value: `\`\`\`${state.content.slice(0, 500)}\`\`\`` }
+      { name: "Mesaj İçeriği", value: `\`\`\`${state.content.slice(0, 500)}\`\`\`` }
     )
     .setFooter({ text: "Anti-Spam Sistemi", iconURL: botAvatar })
     .setTimestamp();
+
+  if (type === "warn") {
+    embed.setColor(Colors.Yellow).setTitle("⚠️ Spam Tespit Edildi — Uyarıldı ve Mesajlar Silindi");
+  } else {
+    embed
+      .setColor(Colors.Red)
+      .setTitle("🔇 Spam Tespit Edildi — 1 Günlük Zaman Aşımı Uygulandı")
+      .addFields({
+        name: "Zaman Aşımı",
+        value: timeoutApplied ? "✅ 1 gün (24 saat) uygulandı" : "❌ Uygulanamadı (bot izni yetersiz olabilir)",
+      });
+  }
 
   await logChannel.send({ embeds: [embed] }).catch((err) => {
     console.error("[anti-spam] Log gönderilemedi:", err);
