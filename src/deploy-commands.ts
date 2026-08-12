@@ -47,6 +47,18 @@ const hikayeAnalizCommand = new SlashCommandBuilder()
     option.setName("dosya").setDescription("Uzun hikayeler için .txt dosyası yükle").setRequired(false)
   );
 
+const silCommand = new SlashCommandBuilder()
+  .setName("sil")
+  .setDescription("Bu kanaldan belirtilen sayıda mesajı siler (Sadece Kurucu/Yetkili Ekibi)")
+  .addIntegerOption((option) =>
+    option
+      .setName("sayı")
+      .setDescription("Silinecek mesaj sayısı (1-100)")
+      .setRequired(true)
+      .setMinValue(1)
+      .setMaxValue(100)
+  );
+
 const ALL_COMMANDS = [
   pingCommand.toJSON(),
   ticketPanelCommand.toJSON(),
@@ -56,6 +68,7 @@ const ALL_COMMANDS = [
   voiceTimeCommand.toJSON(),
   analizCommand.toJSON(),
   hikayeAnalizCommand.toJSON(),
+  silCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */

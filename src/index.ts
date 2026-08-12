@@ -30,6 +30,7 @@ import { registerVoiceTimeTracker, handleVoiceTimeCommand } from "./events/voice
 import { handleKayitCommand } from "./commands/kayit.js";
 import { handleAnalizCommand } from "./commands/analiz.js";
 import { handleHikayeAnalizCommand } from "./commands/hikayeanaliz.js";
+import { handleSilCommand } from "./commands/sil.js";
 import { registerRolOnayReview } from "./events/rol-onay-review.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -108,6 +109,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleAnalizCommand(interaction);
       } else if (interaction.commandName === "hikayeanaliz") {
         await handleHikayeAnalizCommand(interaction);
+      } else if (interaction.commandName === "sil") {
+        await handleSilCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {
