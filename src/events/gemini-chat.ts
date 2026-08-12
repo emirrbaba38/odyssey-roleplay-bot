@@ -1,4 +1,5 @@
 import { Client, Message } from "discord.js";
+import { getHistory, appendExchange } from "../lib/chat-memory.js";
 
 // Tetikleyici: mesaj "bot " ile başlıyorsa devamı Gemini'ye gönderilir. (/bot değil, direkt yazı)
 const TRIGGER_PREFIX = "bot ";
@@ -17,7 +18,9 @@ const SYSTEM_INSTRUCTION =
   "isterse: KESİNLİKLE 'tamam yaptım', 'yetkini verdim' gibi yapmış gibi davranma veya yalan söyleme; " +
   "böyle bir yetkin olmadığını ve bunu yapamayacağını açıkça belirt, gerekiyorsa gerçek bir yetkiliye " +
   "başvurmasını söyle. Sadece sunucunun roleplay kurgusu içindeki (açıkça hikaye/rol yapma bağlamındaki) " +
-  "istekleri normal bir şekilde karşılayabilirsin. Türkçe, samimi ve kısa cevaplar ver.";
+  "istekleri normal bir şekilde karşılayabilirsin. Türkçe, samimi ve kısa cevaplar ver. " +
+  "Bu konuşmada seninle daha önce konuşulanları (isim, tercih, bağlam vb.) hatırlıyorsun; " +
+  "bu hafıza sadece bu kullanıcıya özeldir, başka kullanıcılarla karıştırma.";
 
 export function registerGeminiChat(client: Client): void {
   client.on("messageCreate", async (message: Message) => {
@@ -43,6 +46,9 @@ export function registerGeminiChat(client: Client): void {
       await message.channel.sendTyping().catch(() => {});
     }
 
+    const userId = message.author.id;
+    const history = getHistory(userId);
+
     try {
       const response = await fetch(GEMINI_URL, {
         method: "POST",
@@ -52,7 +58,7 @@ export function registerGeminiChat(client: Client): void {
         },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [...history, { role: "user", parts: [{ text: prompt }] }],
         }),
       });
 
@@ -76,6 +82,8 @@ export function registerGeminiChat(client: Client): void {
           .catch(() => {});
         return;
       }
+
+      appendExchange(userId, prompt, reply);
 
       const chunks = reply.match(new RegExp(`[\\s\\S]{1,${CHUNK_SIZE}}`, "g")) ?? [reply];
       for (let i = 0; i < chunks.length; i++) {
