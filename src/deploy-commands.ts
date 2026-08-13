@@ -59,6 +59,16 @@ const silCommand = new SlashCommandBuilder()
       .setMaxValue(100)
   );
 
+const cekilisCommand = new SlashCommandBuilder()
+  .setName("çekiliş")
+  .setDescription("Katılma butonlu bir çekiliş paneli açar (Sadece Kurucu)")
+  .addStringOption((option) =>
+    option
+      .setName("ödül")
+      .setDescription("Çekilişte verilecek ödül / panelde gösterilecek yazı")
+      .setRequired(true)
+  );
+
 const ALL_COMMANDS = [
   pingCommand.toJSON(),
   ticketPanelCommand.toJSON(),
@@ -69,6 +79,7 @@ const ALL_COMMANDS = [
   analizCommand.toJSON(),
   hikayeAnalizCommand.toJSON(),
   silCommand.toJSON(),
+  cekilisCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */

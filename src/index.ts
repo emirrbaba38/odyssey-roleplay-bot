@@ -32,6 +32,13 @@ import { handleAnalizCommand } from "./commands/analiz.js";
 import { handleHikayeAnalizCommand } from "./commands/hikayeanaliz.js";
 import { handleSilCommand } from "./commands/sil.js";
 import { registerRolOnayReview } from "./events/rol-onay-review.js";
+import {
+  handleCekilisCommand,
+  handleCekilisJoinButton,
+  handleCekilisEndButton,
+  CEKILIS_JOIN_PREFIX,
+  CEKILIS_END_PREFIX,
+} from "./commands/cekilis.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -111,6 +118,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleHikayeAnalizCommand(interaction);
       } else if (interaction.commandName === "sil") {
         await handleSilCommand(interaction);
+      } else if (interaction.commandName === "çekiliş") {
+        await handleCekilisCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {
@@ -128,6 +137,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleTicketAddMemberButton(interaction);
       } else if (interaction.customId.startsWith(TICKET_CLOSE_PREFIX)) {
         await handleTicketCloseButton(interaction);
+      } else if (interaction.customId.startsWith(CEKILIS_JOIN_PREFIX)) {
+        await handleCekilisJoinButton(interaction);
+      } else if (interaction.customId.startsWith(CEKILIS_END_PREFIX)) {
+        await handleCekilisEndButton(interaction);
       }
     }
   } catch (err) {
