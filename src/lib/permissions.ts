@@ -18,6 +18,14 @@ export const ANALIZ_ROLE_IDS = [
   "1535212990713040939",
 ];
 
+// /topall komutunu kullanabilecek roller (birden fazla rol ID'si).
+export const TOPALL_ROLE_IDS = [
+  "1535212994571669575",
+  "1535212990713040939",
+  "1535212989370867743",
+  "1535212993636466688",
+];
+
 // Hata mesajlarında gösterilecek okunabilir isimler (yetki kontrolü için kullanılmıyor)
 export const KURUCU_ROLE_NAME = "🔱・Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";

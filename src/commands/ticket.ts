@@ -25,7 +25,9 @@ import {
   KURUCU_ROLE_ID,
   TICKET_STAFF_ROLE_ID,
   YONETIM_SEFI_ROLE_ID,
+  TOPALL_ROLE_IDS,
   memberHasRoleId,
+  memberHasAnyRoleId,
   findRoleById,
 } from "../lib/permissions.js";
 import {
@@ -475,14 +477,13 @@ export async function handleTopAllCommand(interaction: ChatInputCommandInteracti
     return;
   }
 
-  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
+  if (!memberHasAnyRoleId(member as GuildMember, TOPALL_ROLE_IDS)) {
     await interaction.reply({
-      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      content: "❌ Bu komutu kullanmaya yetkin yok.",
       ephemeral: true,
     });
     return;
   }
-
   const stats = getAllClosedTicketStats();
   const madalyalar = ["🥇", "🥈", "🥉"];
 
