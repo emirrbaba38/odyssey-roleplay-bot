@@ -22,58 +22,83 @@ const SYSTEM_INSTRUCTION =
   "Bu konuşmada seninle daha önce konuşulanları (isim, tercih, bağlam vb.) hatırlıyorsun; " +
   "bu hafıza sadece bu kullanıcıya özeldir, başka kullanıcılarla karıştırma.";
 
-// Geçici (yoğunluk/rate-limit) hatalarda otomatik tekrar denenecek durum kodları.
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = 4;
-const RETRY_DELAYS_MS = [800, 1500, 3000]; // her deneme arasındaki bekleme
+// Geçici (yoğunluk) hatalarda aynı key ile tekrar denenecek durum kodları.
+const TRANSIENT_STATUS = new Set([500, 502, 503, 504]);
+// Bu key artık kullanılamaz (kota/yetki) sayılıp bir SONRAKİ key'e geçilecek durum kodları.
+const KEY_EXHAUSTED_STATUS = new Set([429, 401, 403]);
+const PER_KEY_ATTEMPTS = 2; // her key için: 1 ilk deneme + 1 tekrar (sadece 5xx'te)
+const RETRY_DELAY_MS = 1200;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callGeminiWithRetry(
+/** GEMINI_API_KEY_SOHBET ile başlayan tüm ortam değişkenlerini toplar
+ * (GEMINI_API_KEY_SOHBET, GEMINI_API_KEY_SOHBET_2, GEMINI_API_KEY_SOHBET_3, ...).
+ * Railway'e yeni bir key eklemek için sadece bu isim kalıbıyla yeni bir
+ * Variable eklemek yeterli, kod değişikliği gerekmez. */
+function loadApiKeys(): string[] {
+  return Object.entries(process.env)
+    .filter(([name, value]) => name.startsWith("GEMINI_API_KEY_SOHBET") && !!value)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, value]) => value as string);
+}
+
+async function callGeminiWithRotation(
   url: string,
-  apiKey: string,
+  apiKeys: string[],
   body: unknown
 ): Promise<{ ok: true; data: unknown } | { ok: false; status: number; errText: string }> {
   let lastStatus = 0;
   let lastErrText = "";
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    if (attempt > 0) {
-      await sleep(RETRY_DELAYS_MS[attempt - 1] ?? 3000);
-    }
+  for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex++) {
+    const apiKey = apiKeys[keyIndex];
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (response.ok) {
-        return { ok: true, data: await response.json() };
+    for (let attempt = 0; attempt < PER_KEY_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        await sleep(RETRY_DELAY_MS);
       }
 
-      lastStatus = response.status;
-      lastErrText = await response.text();
-      console.error(
-        `[gemini-chat] API hatası (deneme ${attempt + 1}/${MAX_ATTEMPTS}):`,
-        lastStatus,
-        lastErrText
-      );
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
+          },
+          body: JSON.stringify(body),
+        });
 
-      if (!RETRYABLE_STATUS.has(response.status)) {
-        // Kalıcı bir hata (ör. 400 geçersiz istek, 401/403 yetki) — tekrar denemenin anlamı yok.
-        break;
+        if (response.ok) {
+          return { ok: true, data: await response.json() };
+        }
+
+        lastStatus = response.status;
+        lastErrText = await response.text();
+        console.error(
+          `[gemini-chat] API hatası (key ${keyIndex + 1}/${apiKeys.length}, deneme ${attempt + 1}/${PER_KEY_ATTEMPTS}):`,
+          lastStatus,
+          lastErrText
+        );
+
+        if (KEY_EXHAUSTED_STATUS.has(response.status)) {
+          // Kota bitti / yetki sorunu — bu key'de ısrar etmenin anlamı yok, sıradaki key'e geç.
+          break;
+        }
+        if (!TRANSIENT_STATUS.has(response.status)) {
+          // Ör. 400 geçersiz istek — bu key değişse de sonuç değişmez, direkt vazgeç.
+          return { ok: false, status: lastStatus, errText: lastErrText };
+        }
+        // 5xx ise iç döngü devam eder, aynı key'i bir kez daha dener.
+      } catch (err) {
+        lastStatus = -1;
+        lastErrText = String(err);
+        console.error(
+          `[gemini-chat] İstek başarısız (key ${keyIndex + 1}/${apiKeys.length}, deneme ${attempt + 1}/${PER_KEY_ATTEMPTS}):`,
+          err
+        );
       }
-    } catch (err) {
-      lastStatus = -1;
-      lastErrText = String(err);
-      console.error(`[gemini-chat] İstek başarısız (deneme ${attempt + 1}/${MAX_ATTEMPTS}):`, err);
     }
   }
 
@@ -91,8 +116,8 @@ export function registerGeminiChat(client: Client): void {
     const prompt = content.slice(TRIGGER_PREFIX.length).trim();
     if (!prompt) return;
 
-    const apiKey = process.env.GEMINI_API_KEY_SOHBET;
-    if (!apiKey) {
+    const apiKeys = loadApiKeys();
+    if (apiKeys.length === 0) {
       console.error("[gemini-chat] GEMINI_API_KEY_SOHBET ortam değişkeni tanımlı değil.");
       await message
         .reply("❌ Şu an yapılandırılmadım, bir yetkiliye haber ver.")
@@ -108,7 +133,7 @@ export function registerGeminiChat(client: Client): void {
     const history = getHistory(userId);
 
     try {
-      const result = await callGeminiWithRetry(GEMINI_URL, apiKey, {
+      const result = await callGeminiWithRotation(GEMINI_URL, apiKeys, {
         system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
         contents: [...history, { role: "user", parts: [{ text: prompt }] }],
       });
