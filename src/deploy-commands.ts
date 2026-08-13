@@ -67,6 +67,22 @@ const cekilisCommand = new SlashCommandBuilder()
       .setName("ödül")
       .setDescription("Çekilişte verilecek ödül / panelde gösterilecek yazı")
       .setRequired(true)
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("saat")
+      .setDescription("Çekilişin kaç saat sonra biteceği")
+      .setMinValue(0)
+      .setMaxValue(720)
+      .setRequired(false)
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("dakika")
+      .setDescription("Çekilişin kaç dakika sonra biteceği")
+      .setMinValue(0)
+      .setMaxValue(59)
+      .setRequired(false)
   );
 
 const ALL_COMMANDS = [

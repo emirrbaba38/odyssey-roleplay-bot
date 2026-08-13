@@ -8,23 +8,47 @@ import {
   Colors,
   GuildMember,
   TextChannel,
+  Client,
 } from "discord.js";
 import { KURUCU_ROLE_ID, KURUCU_ROLE_NAME, memberHasRoleId } from "../lib/permissions.js";
 
 export const CEKILIS_JOIN_PREFIX = "cekilis_katil_";
 export const CEKILIS_END_PREFIX = "cekilis_bitir_";
 
+const UPDATE_INTERVAL_MS = 15_000; // panel her 15 saniyede bir güncellenir
+
 interface GiveawayState {
   prize: string;
   hostUsername: string;
   participants: Set<string>;
   ended: boolean;
+  endsAt: number; // Date.now() + süre (ms)
+  guildId: string;
+  channelId: string;
+  messageId: string | null;
+  timer: ReturnType<typeof setInterval> | null;
 }
 
 // key: giveawayId (interaction.id, benzersiz) -> durum (bot yeniden başlayınca sıfırlanır)
 const giveaways = new Map<string, GiveawayState>();
 
+/** Kalan süreyi "1 saat 7 dakika" gibi okunur bir metne çevirir. */
+function formatRemaining(ms: number): string {
+  if (ms <= 0) return "Süre doldu";
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours} saat`);
+  if (hours > 0 || minutes > 0) parts.push(`${minutes} dakika`);
+  if (hours === 0 && minutes === 0) parts.push(`${seconds} saniye`);
+  return parts.join(" ");
+}
+
 function buildGiveawayEmbed(guildName: string, botAvatarURL: string | null, state: GiveawayState) {
+  const remainingMs = state.endsAt - Date.now();
   const embed = new EmbedBuilder()
     .setColor(state.ended ? Colors.Greyple : Colors.Gold)
     .setAuthor({ name: guildName, iconURL: botAvatarURL ?? undefined })
@@ -35,7 +59,8 @@ function buildGiveawayEmbed(guildName: string, botAvatarURL: string | null, stat
           ? "▫️ Bu çekiliş kapandı, artık katılım alınmıyor."
           : "▫️ Katılmak için aşağıdaki **🎉 Katıl** butonuna tıkla\n" +
             "▫️ Bir çekilişe sadece **1 kez** katılabilirsin") +
-        `\n\n👥 **Katılımcı:** ${state.participants.size}`
+        `\n\n⏰ **Kalan süre:** ${state.ended ? "Sona erdi" : formatRemaining(remainingMs)}` +
+        `\n👥 **Katılımcı:** ${state.participants.size}`
     )
     .setThumbnail(botAvatarURL)
     .setFooter({ text: `Çekilişi başlatan: ${state.hostUsername}` })
@@ -60,6 +85,81 @@ function buildGiveawayRow(giveawayId: string, ended: boolean) {
   );
 }
 
+/** Çekilişi kapatır: kazananı seçer, paneli ve mesajı günceller, timer'ı temizler. */
+async function finishGiveaway(client: Client, giveawayId: string, state: GiveawayState): Promise<void> {
+  if (state.ended) return;
+  state.ended = true;
+
+  if (state.timer) {
+    clearInterval(state.timer);
+    state.timer = null;
+  }
+
+  const participantIds = Array.from(state.participants);
+  const winnerId = participantIds.length > 0 ? participantIds[Math.floor(Math.random() * participantIds.length)] : null;
+
+  try {
+    const channel = (await client.channels.fetch(state.channelId)) as TextChannel | null;
+    if (!channel) return;
+
+    const guild = channel.guild;
+    const botAvatarURL = client.user?.displayAvatarURL({ size: 512 }) ?? null;
+    const embed = buildGiveawayEmbed(guild?.name ?? "Çekiliş", botAvatarURL, state);
+    if (winnerId) {
+      embed.addFields({ name: "🏆 Kazanan", value: `<@${winnerId}>` });
+    }
+
+    if (state.messageId) {
+      const message = await channel.messages.fetch(state.messageId).catch(() => null);
+      if (message) {
+        await message.edit({ embeds: [embed], components: [buildGiveawayRow(giveawayId, true)] }).catch(() => {});
+      }
+    }
+
+    if (winnerId) {
+      await channel
+        .send({
+          content: `🎉 Tebrikler <@${winnerId}>! **${state.prize}** çekilişini kazandın!`,
+          allowedMentions: { users: [winnerId] },
+        })
+        .catch(() => {});
+    } else {
+      await channel.send("😕 Bu çekilişe kimse katılmadığı için bir kazanan belirlenemedi.").catch(() => {});
+    }
+  } catch (err) {
+    console.error(`Çekiliş (${giveawayId}) otomatik sonlandırılırken hata:`, err);
+  }
+}
+
+/** Paneldeki geri sayımı günceller; süre dolduysa çekilişi otomatik bitirir. */
+function startCountdown(client: Client, giveawayId: string, state: GiveawayState): void {
+  state.timer = setInterval(async () => {
+    if (state.ended) {
+      if (state.timer) clearInterval(state.timer);
+      return;
+    }
+
+    if (Date.now() >= state.endsAt) {
+      await finishGiveaway(client, giveawayId, state);
+      return;
+    }
+
+    try {
+      const channel = (await client.channels.fetch(state.channelId)) as TextChannel | null;
+      if (!channel || !state.messageId) return;
+      const message = await channel.messages.fetch(state.messageId).catch(() => null);
+      if (!message) return;
+
+      const guild = channel.guild;
+      const botAvatarURL = client.user?.displayAvatarURL({ size: 512 }) ?? null;
+      const embed = buildGiveawayEmbed(guild?.name ?? "Çekiliş", botAvatarURL, state);
+      await message.edit({ embeds: [embed], components: [buildGiveawayRow(giveawayId, false)] }).catch(() => {});
+    } catch (err) {
+      console.error(`Çekiliş (${giveawayId}) geri sayımı güncellenirken hata:`, err);
+    }
+  }, UPDATE_INTERVAL_MS);
+}
+
 export async function handleCekilisCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   const guild = interaction.guild;
   const executor = interaction.member;
@@ -77,6 +177,18 @@ export async function handleCekilisCommand(interaction: ChatInputCommandInteract
   }
 
   const prize = interaction.options.getString("ödül", true);
+  const saat = interaction.options.getInteger("saat") ?? 0;
+  const dakika = interaction.options.getInteger("dakika") ?? 0;
+  const totalMs = (saat * 60 + dakika) * 60 * 1000;
+
+  if (totalMs <= 0) {
+    await interaction.reply({
+      content: "❌ Çekilişin ne zaman biteceğini girmelisin (`saat` ve/veya `dakika`, en az 1 dakika).",
+      ephemeral: true,
+    });
+    return;
+  }
+
   const giveawayId = interaction.id;
 
   const state: GiveawayState = {
@@ -84,6 +196,11 @@ export async function handleCekilisCommand(interaction: ChatInputCommandInteract
     hostUsername: interaction.user.username,
     participants: new Set(),
     ended: false,
+    endsAt: Date.now() + totalMs,
+    guildId: guild.id,
+    channelId: interaction.channelId,
+    messageId: null,
+    timer: null,
   };
   giveaways.set(giveawayId, state);
 
@@ -92,6 +209,12 @@ export async function handleCekilisCommand(interaction: ChatInputCommandInteract
   const row = buildGiveawayRow(giveawayId, false);
 
   await interaction.reply({ embeds: [embed], components: [row] });
+  const replyMessage = await interaction.fetchReply().catch(() => null);
+  if (replyMessage) {
+    state.messageId = replyMessage.id;
+  }
+
+  startCountdown(interaction.client, giveawayId, state);
 }
 
 export async function handleCekilisJoinButton(interaction: ButtonInteraction): Promise<void> {
@@ -105,7 +228,7 @@ export async function handleCekilisJoinButton(interaction: ButtonInteraction): P
     });
     return;
   }
-  if (state.ended) {
+  if (state.ended || Date.now() >= state.endsAt) {
     await interaction.reply({ content: "❌ Bu çekiliş sona erdi, artık katılım alınmıyor.", ephemeral: true });
     return;
   }
@@ -114,6 +237,7 @@ export async function handleCekilisJoinButton(interaction: ButtonInteraction): P
     return;
   }
 
+  // Not: katılım sadece bu Set'e ekleniyor, herhangi bir kanal/ticket açılmıyor.
   state.participants.add(interaction.user.id);
 
   const embed = buildGiveawayEmbed(
@@ -152,31 +276,6 @@ export async function handleCekilisEndButton(interaction: ButtonInteraction): Pr
     return;
   }
 
-  state.ended = true;
-
-  const participantIds = Array.from(state.participants);
-  const winnerId = participantIds.length > 0 ? participantIds[Math.floor(Math.random() * participantIds.length)] : null;
-
-  const embed = buildGiveawayEmbed(
-    interaction.guild?.name ?? "Çekiliş",
-    interaction.client.user?.displayAvatarURL({ size: 512 }) ?? null,
-    state
-  );
-  if (winnerId) {
-    embed.addFields({ name: "🏆 Kazanan", value: `<@${winnerId}>` });
-  }
-
-  await interaction.update({ embeds: [embed], components: [buildGiveawayRow(giveawayId, true)] });
-
-  const channel = interaction.channel as TextChannel | null;
-  if (winnerId) {
-    await channel
-      ?.send({
-        content: `🎉 Tebrikler <@${winnerId}>! **${state.prize}** çekilişini kazandın!`,
-        allowedMentions: { users: [winnerId] },
-      })
-      .catch(() => {});
-  } else {
-    await channel?.send("😕 Bu çekilişe kimse katılmadığı için bir kazanan belirlenemedi.").catch(() => {});
-  }
+  await interaction.deferUpdate().catch(() => {});
+  await finishGiveaway(interaction.client, giveawayId, state);
 }
