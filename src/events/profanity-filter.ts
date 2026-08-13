@@ -2,6 +2,10 @@ import { Client, Message, EmbedBuilder, Colors } from "discord.js";
 
 const LOG_CHANNEL_NAME = "chat-log";
 
+// Bota hitaben yazılan mesajlar (gemini-chat.ts ile aynı tetikleyici) filtreden
+// muaf tutulur — kullanıcı bota küfür ederse mesaj silinmesin, bot cevap versin.
+const BOT_TRIGGER_PREFIX = "bot ";
+
 // Yasaklı kelime/kalıplar (tam kelime eşleşmesiyle kontrol edilir — yani "hoca"
 // içindeki "oc" gibi parçalar artık tetiklemez, ama "a.m.k" gibi noktalarla
 // bölünmüş yazımlar tek kelime içinde normalize edilip yine yakalanır).
@@ -62,6 +66,9 @@ export function registerProfanityFilter(client: Client): void {
 
     const content = message.content.trim();
     if (!content) return;
+
+    // Bota hitaben yazılan mesajlar ("bot ..." ile başlayanlar) filtreden muaf.
+    if (content.toLowerCase().startsWith(BOT_TRIGGER_PREFIX)) return;
 
     const matched = containsProfanity(content);
     if (!matched) return;
