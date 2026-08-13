@@ -22,6 +22,64 @@ const SYSTEM_INSTRUCTION =
   "Bu konuşmada seninle daha önce konuşulanları (isim, tercih, bağlam vb.) hatırlıyorsun; " +
   "bu hafıza sadece bu kullanıcıya özeldir, başka kullanıcılarla karıştırma.";
 
+// Geçici (yoğunluk/rate-limit) hatalarda otomatik tekrar denenecek durum kodları.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 4;
+const RETRY_DELAYS_MS = [800, 1500, 3000]; // her deneme arasındaki bekleme
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callGeminiWithRetry(
+  url: string,
+  apiKey: string,
+  body: unknown
+): Promise<{ ok: true; data: unknown } | { ok: false; status: number; errText: string }> {
+  let lastStatus = 0;
+  let lastErrText = "";
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await sleep(RETRY_DELAYS_MS[attempt - 1] ?? 3000);
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        return { ok: true, data: await response.json() };
+      }
+
+      lastStatus = response.status;
+      lastErrText = await response.text();
+      console.error(
+        `[gemini-chat] API hatası (deneme ${attempt + 1}/${MAX_ATTEMPTS}):`,
+        lastStatus,
+        lastErrText
+      );
+
+      if (!RETRYABLE_STATUS.has(response.status)) {
+        // Kalıcı bir hata (ör. 400 geçersiz istek, 401/403 yetki) — tekrar denemenin anlamı yok.
+        break;
+      }
+    } catch (err) {
+      lastStatus = -1;
+      lastErrText = String(err);
+      console.error(`[gemini-chat] İstek başarısız (deneme ${attempt + 1}/${MAX_ATTEMPTS}):`, err);
+    }
+  }
+
+  return { ok: false, status: lastStatus, errText: lastErrText };
+}
+
 export function registerGeminiChat(client: Client): void {
   client.on("messageCreate", async (message: Message) => {
     if (message.author.bot) return;
@@ -50,28 +108,19 @@ export function registerGeminiChat(client: Client): void {
     const history = getHistory(userId);
 
     try {
-      const response = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-          contents: [...history, { role: "user", parts: [{ text: prompt }] }],
-        }),
+      const result = await callGeminiWithRetry(GEMINI_URL, apiKey, {
+        system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        contents: [...history, { role: "user", parts: [{ text: prompt }] }],
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("[gemini-chat] API hatası:", response.status, errText);
+      if (!result.ok) {
         await message
           .reply("❌ Şu an cevap veremiyorum, birazdan tekrar dener misin?")
           .catch(() => {});
         return;
       }
 
-      const data = (await response.json()) as {
+      const data = result.data as {
         candidates?: { content?: { parts?: { text?: string }[] } }[];
       };
       const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
