@@ -3,7 +3,7 @@ import { getHistory, appendExchange } from "../lib/chat-memory.js";
 
 // Tetikleyici: mesaj "bot " ile başlıyorsa devamı Gemini'ye gönderilir. (/bot değil, direkt yazı)
 const TRIGGER_PREFIX = "bot ";
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 // Discord tek mesaj karakter limiti (güvenli pay bırakıldı).
 const CHUNK_SIZE = 1900;
