@@ -12,7 +12,7 @@ const BANNED_PATTERNS: string[] = [
   "orospucocugu", "orospucocuğu", "orospu", "piç", "pic",
   "ananisikim", "ananısikim", "ananısiktiğim", "ananisiktigim",
   "babanisikim", "babanısikim",
-  "amk", "aq", "oç",
+  "amk", "oç",
   "göt", "gotherif", "gotveren", "götveren", "ibne", "top",
 
   // Ata / büyüklere hakaret
