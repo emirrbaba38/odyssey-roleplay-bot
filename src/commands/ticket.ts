@@ -21,10 +21,8 @@ import {
 import {
   KURUCU_ROLE_NAME,
   TICKET_STAFF_ROLE_NAME,
-  YONETIM_SEFI_ROLE_NAME,
   KURUCU_ROLE_ID,
   TICKET_STAFF_ROLE_ID,
-  YONETIM_SEFI_ROLE_ID,
   TOPALL_ROLE_IDS,
   memberHasRoleId,
   memberHasAnyRoleId,
@@ -540,14 +538,13 @@ export async function handleTopResetCommand(interaction: ChatInputCommandInterac
     return;
   }
 
-  if (!memberHasRoleId(member as GuildMember, YONETIM_SEFI_ROLE_ID)) {
+  if (!memberHasAnyRoleId(member as GuildMember, TOPALL_ROLE_IDS)) {
     await interaction.reply({
-      content: `❌ Bu komutu sadece **${YONETIM_SEFI_ROLE_NAME}** kullanabilir.`,
+      content: "❌ Bu komutu kullanmaya yetkin yok.",
       ephemeral: true,
     });
     return;
   }
-
   resetClosedTicketStats();
   resetRegistrationStats();
   await interaction.reply("✅ Tüm ticket ve kayıt istatistikleri sıfırlandı.");
