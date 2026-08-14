@@ -52,6 +52,15 @@ export async function handleKayitCommand(interaction: ChatInputCommandInteractio
       await targetMember.roles.add(whitelistRole);
     }
 
+    let nicknameChanged = true;
+    try {
+      await targetMember.setNickname(isim);
+    } catch (err) {
+      // Bot'un rolü hedef üyeden daha altta olabilir (ör. sunucu sahibi/Kurucu) — Discord izin vermez.
+      nicknameChanged = false;
+      console.error("[kayit] takma ad değiştirilemedi:", err);
+    }
+
     incrementRegistration(interaction.user.id);
 
     const embed = new EmbedBuilder()
@@ -63,7 +72,10 @@ export async function handleKayitCommand(interaction: ChatInputCommandInteractio
           `**İsim:** ${isim}\n` +
           `**Kayıt Eden:** ${interaction.user}\n\n` +
           `▫️ **${NEW_PLAYER_ROLE_NAME}** rolü alındı\n` +
-          `▫️ **${WHITELIST_ROLE_NAME}** rolü verildi`
+          `▫️ **${WHITELIST_ROLE_NAME}** rolü verildi\n` +
+          (nicknameChanged
+            ? `▫️ Sunucu ismi **${isim}** olarak güncellendi`
+            : `⚠️ Sunucu ismi güncellenemedi (bot yetkisi bu üye için yeterli değil)`)
       )
       .setFooter({ text: "Kayıt Sistemi" })
       .setTimestamp();
