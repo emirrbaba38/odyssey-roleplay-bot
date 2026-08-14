@@ -1,4 +1,5 @@
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+import { callGeminiWithRetry } from "./gemini-request.js";
 
 const SYSTEM_PROMPT = `Sen bir roleplay Discord sunucusunda rol metinlerini inceleyen bir asistansın.
 Görevin: Metni incele, mantık hatalarını veya kural dışı durumları belirt.
@@ -33,21 +34,10 @@ export async function analyzeRoleText(text: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY bulunamadı!");
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Metin: ${text}` }] }],
-      generationConfig: { temperature: 0.2 }
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API Hatası (${res.status}): ${err.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as {
+  const data = (await callGeminiWithRetry(GEMINI_API_URL, apiKey, {
+    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Metin: ${text}` }] }],
+    generationConfig: { temperature: 0.2 }
+  })) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Analiz alınamadı.";

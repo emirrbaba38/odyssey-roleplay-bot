@@ -1,4 +1,5 @@
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+import { callGeminiWithRetry } from "./gemini-request.js";
 
 const SYSTEM_PROMPT = `Sen bir roleplay Discord sunucusunda karakter hikayelerini (backstory) inceleyen bir asistansın.
 Görevin, oyuncunun yazdığı karakter geçmişini/hikayesini incelemek — davranış anındaki tek bir rol metnini değil, karakterin GEÇMİŞİNİ ve KURGUSUNU değerlendiriyorsun.
@@ -38,21 +39,10 @@ export async function analyzeCharacterBackstory(text: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY_HIKAYE;
   if (!apiKey) throw new Error("GEMINI_API_KEY_HIKAYE bulunamadı!");
 
-  const res = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Karakter Hikayesi: ${text}` }] }],
-      generationConfig: { temperature: 0.2 }
-    })
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API Hatası (${res.status}): ${err.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as {
+  const data = (await callGeminiWithRetry(GEMINI_API_URL, apiKey, {
+    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nİncelenecek Karakter Hikayesi: ${text}` }] }],
+    generationConfig: { temperature: 0.2 }
+  })) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Analiz alınamadı.";
