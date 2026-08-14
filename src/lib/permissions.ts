@@ -11,11 +11,14 @@ export const YONETIM_SEFI_ROLE_ID = "1535212991585194025";
 export const YETKILI_EKIBI_ROLE_ID = "1535213004252258394";
 export const TICKET_STAFF_ROLE_ID = "1535955544190488586";
 
-// /analiz komutunu kullanabilecek roller (birden fazla rol ID'si).
+// /analiz ve /hikayeanaliz komutlarını kullanabilecek roller (birden fazla rol ID'si).
 export const ANALIZ_ROLE_IDS = [
   "1535212992591822919",
   "1535212989370867743",
   "1535212990713040939",
+  "1535212994571669575",
+  "1535212991585194025",
+  "1535212993636466688",
 ];
 
 // /topall komutunu kullanabilecek roller (birden fazla rol ID'si).
