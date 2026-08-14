@@ -1,4 +1,4 @@
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 import { callGeminiWithRetry } from "./gemini-request.js";
 
 const SYSTEM_PROMPT = `Sen bir roleplay Discord sunucusunda karakter hikayelerini (backstory) inceleyen bir asistansın.
