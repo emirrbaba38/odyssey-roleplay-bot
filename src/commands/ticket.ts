@@ -20,10 +20,10 @@ import {
 } from "discord.js";
 import {
   KURUCU_ROLE_NAME,
-  TICKET_STAFF_ROLE_NAME,
   KURUCU_ROLE_ID,
   TICKET_STAFF_ROLE_ID,
   TOPALL_ROLE_IDS,
+  HASSAS_TICKET_ROLE_IDS,
   memberHasRoleId,
   memberHasAnyRoleId,
   findRoleById,
@@ -195,6 +195,10 @@ export async function handleTicketCategorySelect(
       return;
     }
 
+    // "Satın Alımlar", "PM Satın Alımlar" ve "Yetkili Şikayet" hassas kategoriler —
+    // bunlarda Ticket Yetkilisi yerine sadece HASSAS_TICKET_ROLE_IDS listesindeki roller görebilir.
+    const isHassasKategori = HASSAS_KATEGORILER.includes(category.value);
+
     const overwrites = [
       { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
       {
@@ -206,7 +210,21 @@ export async function handleTicketCategorySelect(
         ],
       },
     ];
-    if (ticketStaffRole) {
+    if (isHassasKategori) {
+      for (const roleId of HASSAS_TICKET_ROLE_IDS) {
+        const role = findRoleById(guild, roleId);
+        if (role) {
+          overwrites.push({
+            id: role.id,
+            allow: [
+              PermissionsBitField.Flags.ViewChannel,
+              PermissionsBitField.Flags.SendMessages,
+              PermissionsBitField.Flags.ReadMessageHistory,
+            ],
+          });
+        }
+      }
+    } else if (ticketStaffRole) {
       overwrites.push({
         id: ticketStaffRole.id,
         allow: [
@@ -293,6 +311,19 @@ export async function handleTicketCategorySelect(
   }
 }
 
+export const HASSAS_KATEGORILER = ["satin-alimlar", "pm-satin-alimlar", "yetkili-sikayet"];
+
+/** Kanal adı ("<kategori>-<kullanıcı>" formatında) hassas kategorilerden biriyle mi başlıyor. */
+function isHassasTicketChannel(channelName: string): boolean {
+  return HASSAS_KATEGORILER.some((cat) => channelName.startsWith(`${cat}-`));
+}
+
+/** Bu kanalda ticket üzerinde işlem yapmaya yetkili roller — hassas kategoride
+ * HASSAS_TICKET_ROLE_IDS, normal kategoride sadece TICKET_STAFF_ROLE_ID. */
+function ticketActionRoleIds(channelName: string): string[] {
+  return isHassasTicketChannel(channelName) ? HASSAS_TICKET_ROLE_IDS : [TICKET_STAFF_ROLE_ID];
+}
+
 export async function handleTicketAddMemberButton(interaction: ButtonInteraction): Promise<void> {
   const guild = interaction.guild;
   const member = interaction.member;
@@ -301,9 +332,9 @@ export async function handleTicketAddMemberButton(interaction: ButtonInteraction
     return;
   }
 
-  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
+  if (!memberHasAnyRoleId(member as GuildMember, ticketActionRoleIds((interaction.channel as TextChannel | null)?.name ?? ""))) {
     await interaction.reply({
-      content: `❌ Bu ticket'a sadece **${TICKET_STAFF_ROLE_NAME}** üye ekleyebilir.`,
+      content: "❌ Bu ticket'a üye eklemeye yetkin yok.",
       ephemeral: true,
     });
     return;
@@ -334,9 +365,9 @@ export async function handleTicketAddMemberSelect(interaction: UserSelectMenuInt
     return;
   }
 
-  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
+  if (!memberHasAnyRoleId(member as GuildMember, ticketActionRoleIds((interaction.channel as TextChannel | null)?.name ?? ""))) {
     await interaction.reply({
-      content: `❌ Bu ticket'a sadece **${TICKET_STAFF_ROLE_NAME}** üye ekleyebilir.`,
+      content: "❌ Bu ticket'a üye eklemeye yetkin yok.",
       ephemeral: true,
     });
     return;
@@ -374,9 +405,9 @@ export async function handleTicketClaimButton(interaction: ButtonInteraction): P
     return;
   }
 
-  if (!memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID)) {
+  if (!memberHasAnyRoleId(member as GuildMember, ticketActionRoleIds((interaction.channel as TextChannel | null)?.name ?? ""))) {
     await interaction.reply({
-      content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** sahiplenebilir.`,
+      content: "❌ Bu ticket'ı sahiplenmeye yetkin yok.",
       ephemeral: true,
     });
     return;
@@ -440,11 +471,14 @@ export async function handleTicketCloseButton(interaction: ButtonInteraction): P
     return;
   }
 
-  const isTicketStaff = memberHasRoleId(member as GuildMember, TICKET_STAFF_ROLE_ID);
+  const isTicketStaff = memberHasAnyRoleId(
+    member as GuildMember,
+    ticketActionRoleIds((interaction.channel as TextChannel | null)?.name ?? "")
+  );
 
   if (!isTicketStaff) {
     await interaction.reply({
-      content: `❌ Bu ticket'ı sadece **${TICKET_STAFF_ROLE_NAME}** kapatabilir.`,
+      content: "❌ Bu ticket'ı kapatmaya yetkin yok.",
       ephemeral: true,
     });
     return;

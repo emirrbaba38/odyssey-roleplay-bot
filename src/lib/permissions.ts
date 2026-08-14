@@ -26,6 +26,17 @@ export const TOPALL_ROLE_IDS = [
   "1535212993636466688",
 ];
 
+// "Satın Alımlar", "PM Satın Alımlar" ve "Yetkili Şikayet" ticket kategorilerini
+// SADECE bu roller görebilir — Ticket Yetkilisi rolü bu 3 kategoride görmez.
+export const HASSAS_TICKET_ROLE_IDS = [
+  "1535212986535256156",
+  "1535212989370867743",
+  "1535212990713040939",
+  "1535212991585194025",
+  "1535212992591822919",
+  "1535212994571669575",
+];
+
 // Hata mesajlarında gösterilecek okunabilir isimler (yetki kontrolü için kullanılmıyor)
 export const KURUCU_ROLE_NAME = "🔱・Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";
