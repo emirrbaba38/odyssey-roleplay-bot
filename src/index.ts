@@ -28,6 +28,7 @@ import { registerGeminiChat } from "./events/gemini-chat.js";
 import { registerProfanityFilter } from "./events/profanity-filter.js";
 import { registerVoiceTimeTracker, handleVoiceTimeCommand } from "./events/voice-time-tracker.js";
 import { handleKayitCommand } from "./commands/kayit.js";
+import { handleKaktifCommand } from "./commands/kaktif.js";
 import { handleAnalizCommand } from "./commands/analiz.js";
 import { handleHikayeAnalizCommand } from "./commands/hikayeanaliz.js";
 import { handleSilCommand } from "./commands/sil.js";
@@ -120,6 +121,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await handleSilCommand(interaction);
       } else if (interaction.commandName === "çekiliş") {
         await handleCekilisCommand(interaction);
+      } else if (interaction.commandName === "kaktif") {
+        await handleKaktifCommand(interaction);
       }
       // Yeni komutlar buraya "else if" olarak eklenecek.
     } else if (interaction.isStringSelectMenu()) {

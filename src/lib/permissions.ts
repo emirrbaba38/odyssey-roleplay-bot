@@ -40,6 +40,9 @@ export const HASSAS_TICKET_ROLE_IDS = [
   "1535212994571669575",
 ];
 
+// /kaktif komutunu kullanabilecek roller (birden fazla rol ID'si).
+export const KAKTIF_ROLE_IDS = ["1535212989370867743", "1535212994571669575"];
+
 // Hata mesajlarında gösterilecek okunabilir isimler (yetki kontrolü için kullanılmıyor)
 export const KURUCU_ROLE_NAME = "🔱・Kurucu";
 export const TICKET_STAFF_ROLE_NAME = "Ticket Yetkilisi";

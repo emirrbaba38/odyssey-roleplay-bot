@@ -85,6 +85,10 @@ const cekilisCommand = new SlashCommandBuilder()
       .setRequired(false)
   );
 
+const kaktifCommand = new SlashCommandBuilder()
+  .setName("kaktif")
+  .setDescription("Kayıtların aktif olduğunu duyuran bir panel gönderir (Sadece yetkili roller)");
+
 const ALL_COMMANDS = [
   pingCommand.toJSON(),
   ticketPanelCommand.toJSON(),
@@ -96,6 +100,7 @@ const ALL_COMMANDS = [
   hikayeAnalizCommand.toJSON(),
   silCommand.toJSON(),
   cekilisCommand.toJSON(),
+  kaktifCommand.toJSON(),
 ];
 
 /** Sadece tek bir sunucuya komutları kaydeder (bota yeni sunucu eklendiğinde kullanılır). */
