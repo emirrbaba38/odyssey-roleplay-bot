@@ -1,6 +1,10 @@
-import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember, ChannelType } from "discord.js";
+import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember, ChannelType, AttachmentBuilder } from "discord.js";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { KAKTIF_ROLE_IDS, memberHasAnyRoleId } from "../lib/permissions.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BANNER_PATH = join(__dirname, "..", "..", "assets", "banner.gif");
 const WAITING_CHANNEL_NAME = "Kayıt Bekleme";
 
 export async function handleKaktifCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -32,22 +36,27 @@ export async function handleKaktifCommand(interaction: ChatInputCommandInteracti
   );
 
   const kanalYazisi = waitingChannel ? `<#${waitingChannel.id}>` : `**${WAITING_CHANNEL_NAME}**`;
+  const botAvatar = interaction.client.user.displayAvatarURL({ size: 256 });
 
-  const botAvatar = interaction.client.user.displayAvatarURL({ size: 1024 });
+  const bannerAttachment = new AttachmentBuilder(BANNER_PATH, { name: "banner.gif" });
 
   const embed = new EmbedBuilder()
     .setColor(Colors.Green)
-    .setTitle("📢 Kayıtlar Aktif!")
+    .setAuthor({ name: guild.name, iconURL: botAvatar })
     .setDescription(
-      `Sayın oyuncularımız, kayıtlarımız aktiftir! Katılım sağlamak için ${kanalYazisi} kanalına geçebilirsiniz.`
+      `# 📢 Kayıtlar Aktif!\n\n` +
+        `Sayın oyuncularımız, kayıtlarımız aktiftir!\n` +
+        `Katılım sağlamak için ${kanalYazisi} kanalına geçebilirsiniz.`
     )
-    .setImage(botAvatar)
+    .setImage("attachment://banner.gif")
+    .setThumbnail(botAvatar)
     .setFooter({ text: guild.name })
     .setTimestamp();
 
   await interaction.channel.send({
     content: "@everyone @here",
     embeds: [embed],
+    files: [bannerAttachment],
     allowedMentions: { parse: ["everyone"] },
   });
 
