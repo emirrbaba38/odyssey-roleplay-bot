@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember, ChannelType } from "discord.js";
+import { ChatInputCommandInteraction, GuildMember, ChannelType } from "discord.js";
 import { KAKTIF_ROLE_IDS, memberHasAnyRoleId } from "../lib/permissions.js";
 
 const WAITING_CHANNEL_NAME = "Kayıt Bekleme";
@@ -32,25 +32,20 @@ export async function handleKaktifCommand(interaction: ChatInputCommandInteracti
   );
 
   const kanalYazisi = waitingChannel ? `<#${waitingChannel.id}>` : `**${WAITING_CHANNEL_NAME}**`;
-  // Yüksek çözünürlüklü (1024x1024) kare avatar — Discord embed'i tam genişlikte VE
-  // yeterli yükseklikte gösterir, ince/basık bir banner gibi görünmez.
+  // Yüksek çözünürlüklü (1024x1024) kare avatar. Embed kutusu yerine düz mesaj +
+  // otomatik açılan görsel linki kullanıyoruz — kenarlıksız/kutusuz göründüğü için
+  // biraz daha "geniş/afiş" hissi verir (Discord'un embed genişlik sınırı yine geçerli).
   const botAvatar = interaction.client.user.displayAvatarURL({ size: 1024, extension: "png" });
 
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Green)
-    .setAuthor({ name: guild.name, iconURL: interaction.client.user.displayAvatarURL({ size: 128 }) })
-    .setDescription(
-      `# 📢 Kayıtlar Aktif!\n\n` +
-        `Sayın oyuncularımız, kayıtlarımız aktiftir!\n` +
-        `Katılım sağlamak için ${kanalYazisi} kanalına geçebilirsiniz.`
-    )
-    .setImage(botAvatar)
-    .setFooter({ text: guild.name })
-    .setTimestamp();
+  const mesaj =
+    `@everyone @here\n\n` +
+    `# 📢 Kayıtlar Aktif!\n\n` +
+    `**Sayın oyuncularımız, kayıtlarımız aktiftir!**\n` +
+    `**Katılım sağlamak için ${kanalYazisi} kanalına geçebilirsiniz.**\n\n` +
+    botAvatar;
 
   await interaction.channel.send({
-    content: "@everyone @here",
-    embeds: [embed],
+    content: mesaj,
     allowedMentions: { parse: ["everyone"] },
   });
 
