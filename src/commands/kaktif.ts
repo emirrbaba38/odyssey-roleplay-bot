@@ -1,10 +1,6 @@
-import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember, ChannelType, AttachmentBuilder } from "discord.js";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { ChatInputCommandInteraction, EmbedBuilder, Colors, GuildMember, ChannelType } from "discord.js";
 import { KAKTIF_ROLE_IDS, memberHasAnyRoleId } from "../lib/permissions.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const BANNER_PATH = join(__dirname, "..", "..", "assets", "banner.gif");
 const WAITING_CHANNEL_NAME = "Kayıt Bekleme";
 
 export async function handleKaktifCommand(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -36,27 +32,25 @@ export async function handleKaktifCommand(interaction: ChatInputCommandInteracti
   );
 
   const kanalYazisi = waitingChannel ? `<#${waitingChannel.id}>` : `**${WAITING_CHANNEL_NAME}**`;
-  const botAvatar = interaction.client.user.displayAvatarURL({ size: 256 });
-
-  const bannerAttachment = new AttachmentBuilder(BANNER_PATH, { name: "banner.gif" });
+  // Yüksek çözünürlüklü (1024x1024) kare avatar — Discord embed'i tam genişlikte VE
+  // yeterli yükseklikte gösterir, ince/basık bir banner gibi görünmez.
+  const botAvatar = interaction.client.user.displayAvatarURL({ size: 1024, extension: "png" });
 
   const embed = new EmbedBuilder()
     .setColor(Colors.Green)
-    .setAuthor({ name: guild.name, iconURL: botAvatar })
+    .setAuthor({ name: guild.name, iconURL: interaction.client.user.displayAvatarURL({ size: 128 }) })
     .setDescription(
       `# 📢 Kayıtlar Aktif!\n\n` +
         `Sayın oyuncularımız, kayıtlarımız aktiftir!\n` +
         `Katılım sağlamak için ${kanalYazisi} kanalına geçebilirsiniz.`
     )
-    .setImage("attachment://banner.gif")
-    .setThumbnail(botAvatar)
+    .setImage(botAvatar)
     .setFooter({ text: guild.name })
     .setTimestamp();
 
   await interaction.channel.send({
     content: "@everyone @here",
     embeds: [embed],
-    files: [bannerAttachment],
     allowedMentions: { parse: ["everyone"] },
   });
 
