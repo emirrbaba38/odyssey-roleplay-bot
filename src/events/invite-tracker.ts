@@ -73,7 +73,7 @@ export function registerInviteTracker(client: Client): void {
             `**Sunucuya Katılma Tarihi:** ${katilmaTarihi}\n\n` +
             `Hoşça kal, seni bekliyor olacağız! 👋`
         )
-        .setImage(client.user?.displayAvatarURL({ size: 1024, extension: "png" }) ?? null)
+        .setImage(HOSGELDIN_GIF_URL)
         .setFooter({ text: "Katılım Sistemi" })
         .setTimestamp();
 
