@@ -4,8 +4,6 @@ import { findTextChannelByName } from "../lib/permissions.js";
 const KATILIM_LOG_KANAL = "gelen-giden";
 const HOSGELDIN_GIF_URL =
   "https://cdn.discordapp.com/attachments/1348342995321356348/1535948198710087711/gorselde_ki_ates_yansn_boyle.gif";
-// Şimdilik hoşgeldin ile aynı gif kullanılıyor — istenirse ayrı bir "hoşça kal" gifi ile değiştirilebilir.
-const GULE_GULE_GIF_URL = HOSGELDIN_GIF_URL;
 
 function formatTarih(date: Date): string {
   return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
@@ -75,7 +73,7 @@ export function registerInviteTracker(client: Client): void {
             `**Sunucuya Katılma Tarihi:** ${katilmaTarihi}\n\n` +
             `Hoşça kal, seni bekliyor olacağız! 👋`
         )
-        .setImage(GULE_GULE_GIF_URL)
+        .setImage(client.user?.displayAvatarURL({ size: 1024, extension: "png" }) ?? null)
         .setFooter({ text: "Katılım Sistemi" })
         .setTimestamp();
 
